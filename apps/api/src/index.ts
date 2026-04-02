@@ -13,6 +13,7 @@ import { followUpRoutes } from './routes/follow-ups.js';
 import { botConfigRoutes } from './routes/bot-config.js';
 import { startMessageWorker, stopMessageWorker } from './queues/message.worker.js';
 import { startFollowUpWorker, stopFollowUpWorker } from './queues/follow-up.worker.js';
+import { startEvolutionMonitor, stopEvolutionMonitor } from './services/evolution-monitor.js';
 import { logger } from './utils/logger.js';
 
 async function main() {
@@ -55,9 +56,13 @@ async function main() {
     logger.warn('Redis not available — queue workers disabled. API routes still work.');
   }
 
+  // Start Evolution API monitor
+  startEvolutionMonitor();
+
   // Graceful shutdown
   const shutdown = async () => {
     logger.info('Shutting down...');
+    stopEvolutionMonitor();
     await stopMessageWorker();
     await stopFollowUpWorker();
     await app.close();
