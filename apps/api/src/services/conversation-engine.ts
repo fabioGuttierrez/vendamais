@@ -3,6 +3,7 @@ import { logger } from '../utils/logger.js';
 import { toE164 } from '@vendamais/shared';
 import { sendText } from './evolution-api.js';
 import { generateResponse } from './claude-ai.js';
+import { transcribeAudio } from './audio-transcription.js';
 import { followUpQueue } from '../queues/connection.js';
 import type { InboundMessageJob } from '../queues/message.worker.js';
 import type { FollowUpJob } from '../queues/follow-up.worker.js';
@@ -11,8 +12,20 @@ import type { ConversationState } from '@vendamais/shared';
 const supabase = () => getSupabase();
 
 export async function processInboundMessage(job: InboundMessageJob): Promise<void> {
-  const { phoneNormalized, pushName, content, messageType, mediaUrl, evolutionMessageId } = job;
+  const { phoneNormalized, pushName, messageType, mediaUrl, evolutionMessageId } = job;
+  let { content } = job;
   const phone = toE164(phoneNormalized);
+
+  // 0. Transcribe audio if it's an audio message
+  if (messageType === 'audio' && evolutionMessageId) {
+    const transcription = await transcribeAudio(evolutionMessageId, mediaUrl);
+    if (transcription) {
+      content = `[Áudio transcrito]: ${transcription}`;
+      logger.info({ phone }, 'Audio transcribed for processing');
+    } else {
+      content = '[Áudio - não foi possível transcrever]';
+    }
+  }
 
   // 1. Upsert contact
   const { data: contact, error: contactError } = await supabase()

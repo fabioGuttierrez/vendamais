@@ -15,6 +15,7 @@ const envSchema = z.object({
   EVOLUTION_INSTANCE_NAME: z.string().default('likemove360'),
   REDIS_URL: z.string().default('redis://localhost:6379'),
   WEBHOOK_SECRET: z.string().min(1),
+  GROQ_API_KEY: z.string().min(1).optional(),
   NEXT_PUBLIC_SUPABASE_URL: z.string().url().optional(),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().optional(),
 });
