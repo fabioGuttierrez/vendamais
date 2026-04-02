@@ -119,10 +119,7 @@ export async function processInboundMessage(job: InboundMessageJob): Promise<voi
     return;
   }
 
-  // 8. Send response via WhatsApp
-  await sendText(phoneNormalized, aiResponse.text);
-
-  // 9. Store outbound message
+  // 8. Store outbound message FIRST (so we never lose the AI response)
   await storeMessage(
     conversation.id,
     contact.id,
@@ -135,6 +132,14 @@ export async function processInboundMessage(job: InboundMessageJob): Promise<voi
     aiResponse.model,
     aiResponse.tokensUsed,
   );
+
+  // 9. Send response via WhatsApp (retry built-in, but if it fails the message is already saved)
+  try {
+    await sendText(phoneNormalized, aiResponse.text);
+  } catch (error) {
+    logger.error({ phone, error }, 'Failed to send WhatsApp message — response saved in DB for manual retry');
+    // Message is already stored, human agent can see it in the dashboard and resend manually
+  }
 
   // 10. Update conversation metadata
   await supabase()

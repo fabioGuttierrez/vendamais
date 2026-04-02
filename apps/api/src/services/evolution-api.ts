@@ -8,11 +8,29 @@ const headers = () => ({
   apikey: env.EVOLUTION_API_KEY,
 });
 
+const RETRY_DELAYS = [2000, 5000, 10000]; // 2s, 5s, 10s
+
+async function fetchWithRetry(url: string, options: RequestInit, retries = RETRY_DELAYS): Promise<Response> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000); // 15s timeout
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(timeout);
+    return res;
+  } catch (error) {
+    if (retries.length === 0) throw error;
+    const [delay, ...remaining] = retries;
+    logger.warn({ url, delay, retriesLeft: remaining.length }, 'Evolution API request failed, retrying...');
+    await new Promise((r) => setTimeout(r, delay));
+    return fetchWithRetry(url, options, remaining);
+  }
+}
+
 export async function sendText(phone: string, text: string): Promise<void> {
   const url = `${baseUrl()}/message/sendText/${env.EVOLUTION_INSTANCE_NAME}`;
   const body: EvolutionSendTextPayload = { number: phone, text };
 
-  const res = await fetch(url, {
+  const res = await fetchWithRetry(url, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify(body),
@@ -20,7 +38,7 @@ export async function sendText(phone: string, text: string): Promise<void> {
 
   if (!res.ok) {
     const error = await res.text();
-    logger.error({ phone, error }, 'Failed to send WhatsApp message');
+    logger.error({ phone, error, status: res.status }, 'Failed to send WhatsApp message');
     throw new Error(`Evolution API error: ${res.status} ${error}`);
   }
 
@@ -37,7 +55,7 @@ export async function sendMedia(
   const url = `${baseUrl()}/message/sendMedia/${env.EVOLUTION_INSTANCE_NAME}`;
   const body = { number: phone, mediatype, media, caption, fileName };
 
-  const res = await fetch(url, {
+  const res = await fetchWithRetry(url, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify(body),
@@ -50,8 +68,15 @@ export async function sendMedia(
 }
 
 export async function getConnectionState(): Promise<string> {
-  const url = `${baseUrl()}/instance/connectionState/${env.EVOLUTION_INSTANCE_NAME}`;
-  const res = await fetch(url, { headers: headers() });
-  const data = (await res.json()) as { instance?: { state?: string } };
-  return data?.instance?.state ?? 'unknown';
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const url = `${baseUrl()}/instance/connectionState/${env.EVOLUTION_INSTANCE_NAME}`;
+    const res = await fetch(url, { headers: headers(), signal: controller.signal });
+    clearTimeout(timeout);
+    const data = (await res.json()) as { instance?: { state?: string } };
+    return data?.instance?.state ?? 'unknown';
+  } catch {
+    return 'offline';
+  }
 }
