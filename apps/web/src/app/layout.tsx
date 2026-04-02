@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import './globals.css';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'VendaMais - CRM Like Move 360',
   description: 'Sistema de vendas WhatsApp + CRM',
