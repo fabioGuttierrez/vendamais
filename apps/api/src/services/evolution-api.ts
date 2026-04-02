@@ -1,12 +1,7 @@
 import { env } from '../config/env.js';
+import { getEvolutionConfig } from '../config/evolution-config.js';
 import { logger } from '../utils/logger.js';
 import type { EvolutionSendTextPayload } from '@vendamais/shared';
-
-const baseUrl = () => `${env.EVOLUTION_API_URL}`;
-const headers = () => ({
-  'Content-Type': 'application/json',
-  apikey: env.EVOLUTION_API_KEY,
-});
 
 const RETRY_DELAYS = [2000, 5000, 10000]; // 2s, 5s, 10s
 
@@ -27,12 +22,13 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = RETRY
 }
 
 export async function sendText(phone: string, text: string): Promise<void> {
-  const url = `${baseUrl()}/message/sendText/${env.EVOLUTION_INSTANCE_NAME}`;
+  const config = await getEvolutionConfig();
+  const url = `${config.apiUrl}/message/sendText/${config.instanceName}`;
   const body: EvolutionSendTextPayload = { number: phone, text };
 
   const res = await fetchWithRetry(url, {
     method: 'POST',
-    headers: headers(),
+    headers: { 'Content-Type': 'application/json', apikey: config.apiKey },
     body: JSON.stringify(body),
   });
 
@@ -52,12 +48,13 @@ export async function sendMedia(
   caption?: string,
   fileName?: string,
 ): Promise<void> {
-  const url = `${baseUrl()}/message/sendMedia/${env.EVOLUTION_INSTANCE_NAME}`;
+  const config = await getEvolutionConfig();
+  const url = `${config.apiUrl}/message/sendMedia/${config.instanceName}`;
   const body = { number: phone, mediatype, media, caption, fileName };
 
   const res = await fetchWithRetry(url, {
     method: 'POST',
-    headers: headers(),
+    headers: { 'Content-Type': 'application/json', apikey: config.apiKey },
     body: JSON.stringify(body),
   });
 
@@ -69,10 +66,11 @@ export async function sendMedia(
 
 export async function getConnectionState(): Promise<string> {
   try {
+    const config = await getEvolutionConfig();
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
-    const url = `${baseUrl()}/instance/connectionState/${env.EVOLUTION_INSTANCE_NAME}`;
-    const res = await fetch(url, { headers: headers(), signal: controller.signal });
+    const url = `${config.apiUrl}/instance/connectionState/${config.instanceName}`;
+    const res = await fetch(url, { headers: { apikey: config.apiKey }, signal: controller.signal });
     clearTimeout(timeout);
     const data = (await res.json()) as { instance?: { state?: string } };
     return data?.instance?.state ?? 'unknown';

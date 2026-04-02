@@ -1,7 +1,7 @@
-import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 import { getConnectionState } from '../services/evolution-api.js';
 import { getSupabase } from '../config/supabase.js';
+import { getEvolutionConfig } from '../config/evolution-config.js';
 
 const CHECK_INTERVAL = 60_000; // 1 minute
 const RECONNECT_COOLDOWN = 300_000; // 5 minutes between reconnect attempts
@@ -57,12 +57,14 @@ async function attemptReconnect(): Promise<void> {
   logger.info('Evolution API: Attempting to reconnect instance...');
 
   try {
+    const config = await getEvolutionConfig();
+
     // 1. Try to restart the instance connection
     const restartRes = await fetch(
-      `${env.EVOLUTION_API_URL}/instance/restart/${env.EVOLUTION_INSTANCE_NAME}`,
+      `${config.apiUrl}/instance/restart/${config.instanceName}`,
       {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', apikey: env.EVOLUTION_API_KEY },
+        headers: { 'Content-Type': 'application/json', apikey: config.apiKey },
         signal: AbortSignal.timeout(10000),
       },
     );
@@ -75,10 +77,10 @@ async function attemptReconnect(): Promise<void> {
 
     // 2. If restart fails, try connect
     const connectRes = await fetch(
-      `${env.EVOLUTION_API_URL}/instance/connect/${env.EVOLUTION_INSTANCE_NAME}`,
+      `${config.apiUrl}/instance/connect/${config.instanceName}`,
       {
         method: 'GET',
-        headers: { apikey: env.EVOLUTION_API_KEY },
+        headers: { apikey: config.apiKey },
         signal: AbortSignal.timeout(10000),
       },
     );

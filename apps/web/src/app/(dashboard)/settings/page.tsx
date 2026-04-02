@@ -2,18 +2,69 @@
 
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/utils';
-import { Wifi, WifiOff } from 'lucide-react';
+import { Wifi, WifiOff, Save, Eye, EyeOff, Loader2 } from 'lucide-react';
+
+interface BotConfig {
+  key: string;
+  value: unknown;
+}
 
 export default function SettingsPage() {
   const [whatsappStatus, setWhatsappStatus] = useState<string>('checking...');
+  const [configs, setConfigs] = useState<BotConfig[]>([]);
+  const [evolutionUrl, setEvolutionUrl] = useState('');
+  const [evolutionKey, setEvolutionKey] = useState('');
+  const [evolutionInstance, setEvolutionInstance] = useState('');
+  const [showKey, setShowKey] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
 
   useEffect(() => {
-    api<{ whatsapp: string }>('/health')
-      .then((res) => setWhatsappStatus(res.whatsapp))
+    api<{ whatsapp: { state: string } }>('/health')
+      .then((res) => setWhatsappStatus(res.whatsapp.state))
       .catch(() => setWhatsappStatus('error'));
+
+    api<BotConfig[]>('/bot-config')
+      .then((data) => {
+        setConfigs(data);
+        const get = (key: string) => data.find((c) => c.key === key)?.value as string | undefined;
+        setEvolutionUrl(get('evolution_api_url') || '');
+        setEvolutionKey(get('evolution_api_key') || '');
+        setEvolutionInstance(get('evolution_instance_name') || '');
+      })
+      .catch(() => {});
   }, []);
 
   const isConnected = whatsappStatus === 'open';
+
+  async function saveEvolutionConfig() {
+    setSaving(true);
+    setSaveMessage('');
+    try {
+      const entries = [
+        { key: 'evolution_api_url', value: evolutionUrl.trim() },
+        { key: 'evolution_api_key', value: evolutionKey.trim() },
+        { key: 'evolution_instance_name', value: evolutionInstance.trim() },
+      ];
+
+      for (const entry of entries) {
+        if (entry.value) {
+          await api(`/bot-config/${entry.key}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ value: entry.value }),
+          });
+        }
+      }
+
+      setSaveMessage('Configurações salvas com sucesso!');
+      setTimeout(() => setSaveMessage(''), 3000);
+    } catch {
+      setSaveMessage('Erro ao salvar configurações.');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -35,9 +86,74 @@ export default function SettingsPage() {
             </>
           )}
         </div>
+      </div>
+
+      {/* Evolution API Config */}
+      <div className="bg-white rounded-lg border p-6 space-y-4">
+        <h2 className="font-semibold text-lg">Configuração da Evolution API</h2>
         <p className="text-sm text-muted-foreground">
-          A conexão com o WhatsApp é gerenciada pela Evolution API. Se estiver desconectado, verifique o painel da Evolution API.
+          Configure a conexão com a Evolution API. Ao trocar de instância, basta alterar os campos abaixo.
         </p>
+
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium mb-1">URL da API</label>
+            <input
+              type="url"
+              className="w-full rounded-md border px-3 py-2 text-sm font-mono"
+              placeholder="https://evolution.example.com"
+              value={evolutionUrl}
+              onChange={(e) => setEvolutionUrl(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">API Key</label>
+            <div className="relative">
+              <input
+                type={showKey ? 'text' : 'password'}
+                className="w-full rounded-md border px-3 py-2 text-sm font-mono pr-10"
+                placeholder="Sua chave da Evolution API"
+                value={evolutionKey}
+                onChange={(e) => setEvolutionKey(e.target.value)}
+              />
+              <button
+                type="button"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                onClick={() => setShowKey(!showKey)}
+              >
+                {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Nome da Instância</label>
+            <input
+              type="text"
+              className="w-full rounded-md border px-3 py-2 text-sm font-mono"
+              placeholder="likemove360"
+              value={evolutionInstance}
+              onChange={(e) => setEvolutionInstance(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 pt-2">
+          <button
+            className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
+            onClick={saveEvolutionConfig}
+            disabled={saving}
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Salvar
+          </button>
+          {saveMessage && (
+            <span className={`text-sm ${saveMessage.includes('Erro') ? 'text-red-600' : 'text-green-600'}`}>
+              {saveMessage}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* System Info */}

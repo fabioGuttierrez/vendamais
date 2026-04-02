@@ -1,5 +1,6 @@
 import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
+import { getEvolutionConfig } from '../config/evolution-config.js';
 
 const GROQ_TRANSCRIPTION_URL = 'https://api.groq.com/openai/v1/audio/transcriptions';
 
@@ -8,10 +9,11 @@ const GROQ_TRANSCRIPTION_URL = 'https://api.groq.com/openai/v1/audio/transcripti
  */
 async function downloadAudioFromEvolution(messageId: string): Promise<Buffer | null> {
   try {
-    const url = `${env.EVOLUTION_API_URL}/chat/getBase64FromMediaMessage/${env.EVOLUTION_INSTANCE_NAME}`;
+    const config = await getEvolutionConfig();
+    const url = `${config.apiUrl}/chat/getBase64FromMediaMessage/${config.instanceName}`;
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', apikey: env.EVOLUTION_API_KEY },
+      headers: { 'Content-Type': 'application/json', apikey: config.apiKey },
       body: JSON.stringify({ message: { key: { id: messageId } } }),
       signal: AbortSignal.timeout(30000),
     });
