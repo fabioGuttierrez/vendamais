@@ -46,9 +46,18 @@ export async function processInboundMessage(job: InboundMessageJob): Promise<voi
     .single();
 
   if (!conversation) {
+    // Check bot default active setting
+    const { data: botDefaultConfig } = await supabase()
+      .from('bot_config')
+      .select('value')
+      .eq('key', 'bot_default_active')
+      .single();
+
+    const isBotActive = botDefaultConfig?.value !== false;
+
     const { data: newConv, error: convError } = await supabase()
       .from('conversations')
-      .insert({ contact_id: contact.id, state: 'greeting' })
+      .insert({ contact_id: contact.id, state: 'greeting', is_bot_active: isBotActive })
       .select('*')
       .single();
 
@@ -70,12 +79,16 @@ export async function processInboundMessage(job: InboundMessageJob): Promise<voi
   // 4. Store inbound message
   await storeMessage(conversation.id, contact.id, content, 'inbound', 'customer', evolutionMessageId, mediaUrl, messageType);
 
-  // 5. Load products
-  const { data: products } = await supabase()
-    .from('products')
-    .select('*')
-    .eq('active', true)
-    .order('sort_order');
+  // 5. Load products and bot config
+  const [productsRes, botConfigRes] = await Promise.all([
+    supabase().from('products').select('*').eq('active', true).order('sort_order'),
+    supabase().from('bot_config').select('key, value'),
+  ]);
+
+  const products = productsRes.data;
+  const botConfigs = botConfigRes.data || [];
+  const greetingMessage = botConfigs.find((c) => c.key === 'greeting_message')?.value as string | undefined;
+  const customPrompt = botConfigs.find((c) => c.key === 'custom_prompt')?.value as string | undefined;
 
   // 6. Load recent messages for context (last 20)
   const { data: recentMessages } = await supabase()
@@ -97,6 +110,8 @@ export async function processInboundMessage(job: InboundMessageJob): Promise<voi
     (recentMessages || []).slice(0, -1), // exclude current inbound (we pass it separately)
     content,
     async (toolName, input) => executeToolCall(toolName, input, conversation!, contact),
+    customPrompt,
+    greetingMessage,
   );
 
   if (!aiResponse.text) {

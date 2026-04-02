@@ -8,6 +8,7 @@ export default function BotConfigPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [greeting, setGreeting] = useState('');
   const [customPrompt, setCustomPrompt] = useState('');
+  const [botDefaultActive, setBotDefaultActive] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -16,8 +17,10 @@ export default function BotConfigPage() {
     api<any[]>('/bot-config').then((configs) => {
       const greetingConfig = configs.find((c) => c.key === 'greeting_message');
       const promptConfig = configs.find((c) => c.key === 'custom_prompt');
+      const botActiveConfig = configs.find((c) => c.key === 'bot_default_active');
       if (greetingConfig) setGreeting(greetingConfig.value);
       if (promptConfig) setCustomPrompt(promptConfig.value);
+      if (botActiveConfig) setBotDefaultActive(botActiveConfig.value !== false);
     }).catch(console.error);
   }, []);
 
@@ -27,6 +30,7 @@ export default function BotConfigPage() {
       await Promise.all([
         api('/bot-config/greeting_message', { method: 'PUT', body: JSON.stringify({ value: greeting }) }),
         api('/bot-config/custom_prompt', { method: 'PUT', body: JSON.stringify({ value: customPrompt }) }),
+        api('/bot-config/bot_default_active', { method: 'PUT', body: JSON.stringify({ value: botDefaultActive }) }),
       ]);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -43,6 +47,39 @@ export default function BotConfigPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Configuração do Bot</h1>
+
+      {/* Bot Default Active */}
+      <div className="bg-white rounded-lg border p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="font-semibold text-lg">Bot Ativo por Padrão</h2>
+            <p className="text-sm text-muted-foreground">
+              Define se novas conversas iniciam com o bot ativo ou em modo humano
+            </p>
+          </div>
+          <button
+            onClick={() => setBotDefaultActive(!botDefaultActive)}
+            className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+              botDefaultActive ? 'bg-primary' : 'bg-gray-300'
+            }`}
+          >
+            <span
+              className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform shadow ${
+                botDefaultActive ? 'translate-x-7' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
+        <div className={`text-sm font-medium px-3 py-2 rounded-md ${
+          botDefaultActive
+            ? 'bg-green-50 text-green-700 border border-green-200'
+            : 'bg-amber-50 text-amber-700 border border-amber-200'
+        }`}>
+          {botDefaultActive
+            ? 'Novas conversas: Bot responde automaticamente'
+            : 'Novas conversas: Aguardando atendimento humano'}
+        </div>
+      </div>
 
       {/* Products */}
       <div className="bg-white rounded-lg border p-6 space-y-4">
