@@ -11,10 +11,34 @@ export function buildSystemPrompt(
 
   const productCatalog = products
     .filter((p) => p.active)
-    .map(
-      (p) =>
-        `### ${p.name} (slug: ${p.slug})\n${p.description}\n- Ideal para: ${p.ideal_for}\n- Capacidade: ${p.capacity}\n- Entrega: ${p.delivery_time}\n- Diferenciais: ${(p.features as string[]).join(', ')}`,
-    )
+    .map((p) => {
+      const lines: string[] = [
+        `### ${p.name} (slug: ${p.slug})`,
+        p.description,
+        `- Ideal para: ${p.ideal_for}`,
+        `- Capacidade: ${p.capacity}`,
+        `- Entrega dos arquivos: ${p.delivery_time}`,
+        `- Diferenciais: ${(p.features as string[]).join(', ')}`,
+      ];
+      if (p.pricing_info) lines.push(`- Investimento: ${p.pricing_info}`);
+      if (p.package_includes) lines.push(`- O que está incluído: ${p.package_includes}`);
+      if (p.coverage_area) lines.push(`- Área de atendimento: ${p.coverage_area}`);
+      if (p.min_notice_hours) lines.push(`- Antecedência mínima para reserva: ${p.min_notice_hours}h`);
+      if (p.restrictions) lines.push(`- Observações/restrições: ${p.restrictions}`);
+      if (p.technical_specs && Object.keys(p.technical_specs).length > 0) {
+        const specs = Object.entries(p.technical_specs).map(([k, v]) => `${k}: ${v}`).join(', ');
+        lines.push(`- Especificações técnicas: ${specs}`);
+      }
+      if (p.video_url) lines.push(`- Vídeo de demonstração: ${p.video_url}`);
+      if (p.faq && (p.faq as unknown[]).length > 0) {
+        lines.push('- Perguntas frequentes:');
+        (p.faq as { question: string; answer: string }[]).forEach((item) => {
+          lines.push(`  P: ${item.question}`);
+          lines.push(`  R: ${item.answer}`);
+        });
+      }
+      return lines.join('\n');
+    })
     .join('\n\n');
 
   const qualStatus = [

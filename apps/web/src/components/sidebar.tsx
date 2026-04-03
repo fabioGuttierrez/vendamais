@@ -12,6 +12,7 @@ import {
   BarChart3,
   Bot,
   Settings,
+  Package,
 } from 'lucide-react';
 
 const navItems = [
@@ -21,6 +22,7 @@ const navItems = [
   { href: '/pipeline', label: 'Pipeline', icon: Kanban },
   { href: '/follow-ups', label: 'Follow-ups', icon: CalendarClock },
   { href: '/analytics', label: 'Analytics', icon: BarChart3 },
+  { href: '/products', label: 'Produtos', icon: Package },
   { href: '/bot-config', label: 'Config Bot', icon: Bot },
   { href: '/settings', label: 'Configurações', icon: Settings },
 ];

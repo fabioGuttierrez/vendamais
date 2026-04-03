@@ -33,22 +33,4 @@ export async function botConfigRoutes(app: FastifyInstance) {
     return data;
   });
 
-  // Products CRUD
-  app.get('/api/v1/products', async () => {
-    const { data, error } = await supabase.from('products').select('*').order('sort_order');
-    if (error) throw error;
-    return data;
-  });
-
-  app.patch('/api/v1/products/:id', async (request) => {
-    const { id } = request.params as { id: string };
-    const body = request.body as Record<string, unknown>;
-
-    const allowed = ['name', 'description', 'features', 'price_range', 'active', 'sort_order'];
-    const filtered = Object.fromEntries(Object.entries(body).filter(([k]) => allowed.includes(k)));
-
-    const { data, error } = await supabase.from('products').update(filtered).eq('id', id).select().single();
-    if (error) throw error;
-    return data;
-  });
 }
