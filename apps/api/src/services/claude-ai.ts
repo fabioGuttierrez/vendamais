@@ -105,7 +105,27 @@ export async function generateResponse(
 
   // Extract text response
   const textBlock = response.content.find((b): b is ContentBlock & { type: 'text' } => b.type === 'text');
-  const text = textBlock?.text ?? '';
+  let text = textBlock?.text ?? '';
+
+  // Safety net: if Claude returned no text after tool calls, nudge it to respond
+  if (!text.trim() && allToolCalls.length > 0) {
+    logger.warn('Claude returned no text after tool calls, nudging for response');
+    messages.push({ role: 'assistant', content: response.content });
+    messages.push({
+      role: 'user',
+      content: 'Por favor, envie agora sua resposta para o cliente via WhatsApp.',
+    });
+    const nudgeResponse = await anthropic.messages.create({
+      model,
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages,
+      tools: salesTools,
+    });
+    totalTokens += (nudgeResponse.usage?.input_tokens || 0) + (nudgeResponse.usage?.output_tokens || 0);
+    const nudgeText = nudgeResponse.content.find((b): b is ContentBlock & { type: 'text' } => b.type === 'text');
+    text = nudgeText?.text ?? '';
+  }
 
   return { text, toolCalls: allToolCalls, tokensUsed: totalTokens, model };
 }

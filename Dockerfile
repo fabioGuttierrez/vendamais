@@ -18,6 +18,6 @@ COPY tsconfig.base.json ./
 
 # Start API with tsx (dev-like, works with workspace TS sources)
 WORKDIR /app/apps/api
-EXPOSE 8080
+EXPOSE 3001
 
 CMD ["npx", "tsx", "src/index.ts"]
