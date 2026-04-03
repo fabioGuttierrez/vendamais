@@ -75,6 +75,6 @@ export async function getConnectionState(): Promise<string> {
     const data = (await res.json()) as { instance?: { state?: string } };
     return data?.instance?.state ?? 'unknown';
   } catch {
-    return 'offline';
+    return 'unreachable';
   }
 }

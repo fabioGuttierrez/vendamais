@@ -69,9 +69,9 @@ export async function webhookRoutes(app: FastifyInstance) {
       timestamp: data.messageTimestamp || Date.now(),
     };
 
-    // Enqueue for async processing with 3-second delay for message batching
+    // Enqueue for async processing with short delay for message batching
     await messageQueue.add('process-message', job, {
-      delay: 3000,
+      delay: 500,
       attempts: 3,
       backoff: { type: 'exponential', delay: 2000 },
     });

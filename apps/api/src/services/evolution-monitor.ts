@@ -29,7 +29,9 @@ async function checkAndRecover(): Promise<void> {
     consecutiveFailures++;
     logger.warn({ state, consecutiveFailures }, 'Evolution API: WhatsApp not connected');
 
-    if (state === 'close' || state === 'offline') {
+    // Only attempt reconnect if Evolution confirmed the connection is closed (not just unreachable)
+    // and after 3 consecutive confirmed failures
+    if (state === 'close' && consecutiveFailures >= 3) {
       await attemptReconnect();
     }
 
@@ -37,12 +39,8 @@ async function checkAndRecover(): Promise<void> {
   } catch (error) {
     consecutiveFailures++;
     logger.error({ error, consecutiveFailures }, 'Evolution API: Health check failed');
-    lastState = 'error';
-
-    // If Evolution server itself is down, try to restart instance after cooldown
-    if (consecutiveFailures >= 3) {
-      await attemptReconnect();
-    }
+    lastState = 'unreachable';
+    // Do not attempt reconnect when Evolution server is unreachable — it may still be working fine
   }
 }
 
