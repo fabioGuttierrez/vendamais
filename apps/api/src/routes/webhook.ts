@@ -10,6 +10,7 @@ export async function webhookRoutes(app: FastifyInstance) {
     // Verify webhook secret
     const apiKey = (request.headers['apikey'] as string) || (request.headers['x-webhook-secret'] as string);
     if (apiKey !== env.WEBHOOK_SECRET) {
+      logger.warn({ receivedKey: apiKey ?? '(none)', headers: Object.keys(request.headers) }, 'Webhook auth failed');
       return reply.status(401).send({ error: 'Unauthorized' });
     }
 
