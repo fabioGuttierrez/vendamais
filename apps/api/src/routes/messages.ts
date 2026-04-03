@@ -45,8 +45,13 @@ export async function messageRoutes(app: FastifyInstance) {
 
     const contact = conv.contacts as any;
 
-    // Send via WhatsApp
-    await sendText(contact.phone_normalized, content);
+    // Send via WhatsApp (best effort — message is stored regardless)
+    let whatsappError: string | null = null;
+    try {
+      await sendText(contact.phone_normalized, content);
+    } catch (err: any) {
+      whatsappError = err?.message ?? 'Unknown error';
+    }
 
     // Store message
     const { data: message, error } = await supabase
@@ -69,6 +74,6 @@ export async function messageRoutes(app: FastifyInstance) {
       .update({ last_message_at: new Date().toISOString() })
       .eq('id', conversation_id);
 
-    return message;
+    return { ...message, whatsapp_sent: !whatsappError, whatsapp_error: whatsappError };
   });
 }
