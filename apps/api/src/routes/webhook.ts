@@ -7,8 +7,12 @@ import type { InboundMessageJob } from '../queues/message.worker.js';
 
 export async function webhookRoutes(app: FastifyInstance) {
   app.post('/api/v1/webhook/evolution', async (request, reply) => {
-    // Verify webhook secret
-    const apiKey = (request.headers['apikey'] as string) || (request.headers['x-webhook-secret'] as string);
+    // Verify webhook secret (header or query param)
+    const query = request.query as Record<string, string>;
+    const apiKey =
+      (request.headers['apikey'] as string) ||
+      (request.headers['x-webhook-secret'] as string) ||
+      query.secret;
     if (apiKey !== env.WEBHOOK_SECRET) {
       logger.warn({ receivedKey: apiKey ?? '(none)', headers: Object.keys(request.headers) }, 'Webhook auth failed');
       return reply.status(401).send({ error: 'Unauthorized' });
