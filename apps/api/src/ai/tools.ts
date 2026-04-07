@@ -122,7 +122,7 @@ export const salesTools: Tool[] = [
       properties: {
         product_slug: {
           type: 'string',
-          enum: ['plataforma-360-tradicional', 'plataforma-360-aerea', 'espelho-magico-fotografico'],
+          enum: ['max360', 'spinner360', 'espelho-magico'],
           description: 'Produto a verificar',
         },
         date: {
@@ -142,7 +142,7 @@ export const salesTools: Tool[] = [
       properties: {
         product_slug: {
           type: 'string',
-          enum: ['plataforma-360-tradicional', 'plataforma-360-aerea', 'espelho-magico-fotografico'],
+          enum: ['max360', 'spinner360', 'espelho-magico'],
           description: 'Produto a reservar',
         },
         event_date: {
