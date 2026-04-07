@@ -101,6 +101,7 @@ export function findPreset(
   presetId: string,
   customPresets: AgentPreset[] = [],
 ): AgentPreset | undefined {
-  return BUILT_IN_PRESETS.find((p) => p.id === presetId)
-    ?? customPresets.find((p) => p.id === presetId);
+  // Custom presets first — allows overriding built-in presets
+  return customPresets.find((p) => p.id === presetId)
+    ?? BUILT_IN_PRESETS.find((p) => p.id === presetId);
 }

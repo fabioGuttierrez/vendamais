@@ -48,6 +48,7 @@ export default function BotConfigPage() {
   }
 
   async function saveCustomPreset() {
+    const isEditingBuiltIn = editingPreset && builtInPresets.some((p) => p.id === editingPreset.id);
     const id = editingPreset?.id || `custom:${crypto.randomUUID()}`;
     const newPreset: AgentPreset = {
       id,
@@ -58,9 +59,16 @@ export default function BotConfigPage() {
       isBuiltIn: false,
     };
 
-    const updated = editingPreset
-      ? customPresets.map((p) => (p.id === id ? newPreset : p))
-      : [...customPresets, newPreset];
+    let updated: AgentPreset[];
+    if (editingPreset && customPresets.some((p) => p.id === id)) {
+      // Editing an existing custom or previously overridden built-in
+      updated = customPresets.map((p) => (p.id === id ? newPreset : p));
+    } else if (isEditingBuiltIn) {
+      // First time overriding a built-in — add to custom list
+      updated = [...customPresets, newPreset];
+    } else {
+      updated = [...customPresets, newPreset];
+    }
 
     setCustomPresets(updated);
     await api('/bot-config/custom_agent_presets', {
@@ -99,6 +107,35 @@ export default function BotConfigPage() {
     setShowCustomForm(true);
   }
 
+  function startEditBuiltIn(preset: AgentPreset) {
+    // Edit a built-in preset — will be saved as a custom override with the same ID
+    setEditingPreset(preset);
+    // Use the override version if it exists, otherwise the built-in
+    const override = customPresets.find((p) => p.id === preset.id);
+    const source = override || preset;
+    setCustomForm({
+      name: source.name,
+      description: source.description,
+      persona: source.persona,
+      greetingStyle: source.greetingStyle,
+    });
+    setShowCustomForm(true);
+  }
+
+  async function restoreBuiltInPreset(presetId: string) {
+    // Remove the custom override, exposing the original built-in
+    const updated = customPresets.filter((p) => p.id !== presetId);
+    setCustomPresets(updated);
+    await api('/bot-config/custom_agent_presets', {
+      method: 'PUT',
+      body: JSON.stringify({ value: updated }),
+    });
+  }
+
+  function isBuiltInOverridden(presetId: string): boolean {
+    return builtInPresets.some((p) => p.id === presetId) && customPresets.some((p) => p.id === presetId);
+  }
+
   function cancelCustomForm() {
     setShowCustomForm(false);
     setEditingPreset(null);
@@ -125,7 +162,14 @@ export default function BotConfigPage() {
     setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, active: !active } : p)));
   }
 
-  const allPresets = [...builtInPresets, ...customPresets];
+  // Merge: for built-in presets, show the custom override if it exists
+  const overriddenIds = new Set(customPresets.filter((cp) => builtInPresets.some((bp) => bp.id === cp.id)).map((cp) => cp.id));
+  const mergedBuiltIns = builtInPresets.map((bp) => {
+    const override = customPresets.find((cp) => cp.id === bp.id);
+    return override ? { ...override, avatar: bp.avatar } : bp;
+  });
+  const pureCustom = customPresets.filter((cp) => !overriddenIds.has(cp.id));
+  const allPresets = [...mergedBuiltIns, ...pureCustom];
 
   return (
     <div className="space-y-6">
@@ -165,9 +209,34 @@ export default function BotConfigPage() {
               <div className="flex items-center gap-2 mb-1">
                 {preset.avatar && <span className="text-xl">{preset.avatar}</span>}
                 <span className="font-semibold">{preset.name}</span>
+                {isBuiltInOverridden(preset.id) && (
+                  <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-full font-medium">
+                    editado
+                  </span>
+                )}
               </div>
               <p className="text-sm text-muted-foreground line-clamp-2">{preset.description}</p>
-              {!preset.isBuiltIn && (
+              {/* Built-in preset actions */}
+              {builtInPresets.some((bp) => bp.id === preset.id) && (
+                <div className="flex gap-2 mt-2">
+                  <span
+                    onClick={(e) => { e.stopPropagation(); startEditBuiltIn(preset); }}
+                    className="text-xs text-blue-600 hover:underline cursor-pointer"
+                  >
+                    Editar
+                  </span>
+                  {isBuiltInOverridden(preset.id) && (
+                    <span
+                      onClick={(e) => { e.stopPropagation(); restoreBuiltInPreset(preset.id); }}
+                      className="text-xs text-amber-600 hover:underline cursor-pointer"
+                    >
+                      Restaurar Original
+                    </span>
+                  )}
+                </div>
+              )}
+              {/* Custom preset actions */}
+              {!preset.isBuiltIn && !builtInPresets.some((bp) => bp.id === preset.id) && (
                 <div className="flex gap-2 mt-2">
                   <span
                     onClick={(e) => { e.stopPropagation(); startEditPreset(preset); }}
