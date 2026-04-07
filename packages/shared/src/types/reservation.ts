@@ -5,6 +5,7 @@ export interface Reservation {
   product_id: string;
   contact_id: string | null;
   deal_id: string | null;
+  group_id: string | null;
   event_date: string;
   status: ReservationStatus;
   notes: string | null;

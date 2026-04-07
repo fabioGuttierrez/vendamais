@@ -118,9 +118,35 @@ export default function ReservationsPage() {
 
   const weekDays = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
-  function getReservationsForDate(date: Date): ReservationWithRelations[] {
+  // Group reservations by group_id for display
+  type EventGroup = { key: string; label: string; reservations: ReservationWithRelations[] };
+
+  function groupReservationsForDate(date: Date): EventGroup[] {
     const dateStr = format(date, 'yyyy-MM-dd');
-    return reservations.filter((r) => r.event_date === dateStr);
+    const dayRes = reservations.filter((r) => r.event_date === dateStr);
+    const groups: EventGroup[] = [];
+    const grouped = new Set<string>();
+
+    for (const r of dayRes) {
+      if (grouped.has(r.id)) continue;
+      if (r.group_id) {
+        const siblings = dayRes.filter((s) => s.group_id === r.group_id);
+        siblings.forEach((s) => grouped.add(s.id));
+        groups.push({
+          key: r.group_id,
+          label: r.notes || siblings.map((s) => s.products?.name || '?').join(' + '),
+          reservations: siblings,
+        });
+      } else {
+        grouped.add(r.id);
+        groups.push({
+          key: r.id,
+          label: r.products?.name || '?',
+          reservations: [r],
+        });
+      }
+    }
+    return groups;
   }
 
   async function handleCreateReservation() {
@@ -130,6 +156,8 @@ export default function ReservationsPage() {
     try {
       const results: ReservationWithRelations[] = [];
       const errors: string[] = [];
+      // Generate shared group_id when multiple products for same event
+      const groupId = createForm.product_ids.length > 1 ? crypto.randomUUID() : null;
       for (const pid of createForm.product_ids) {
         try {
           const newRes = await api<ReservationWithRelations>('/reservations', {
@@ -139,6 +167,7 @@ export default function ReservationsPage() {
               event_date: selectedDate,
               notes: createForm.notes || null,
               status: createForm.status,
+              group_id: groupId,
             }),
           });
           results.push(newRes);
@@ -333,7 +362,7 @@ export default function ReservationsPage() {
             {/* Day cells */}
             {calendarDays.map((day) => {
               const dateStr = format(day, 'yyyy-MM-dd');
-              const dayReservations = getReservationsForDate(day);
+              const eventGroups = groupReservationsForDate(day);
               const inMonth = isSameMonth(day, currentMonth);
               const today = isToday(day);
 
@@ -355,29 +384,56 @@ export default function ReservationsPage() {
                     {format(day, 'd')}
                   </div>
                   <div className="space-y-0.5">
-                    {dayReservations.map((res) => {
-                      const color = productColorMap[res.product_id] || '#6b7280';
-                      const isCancelled = res.status === 'cancelled';
+                    {eventGroups.map((group) => {
+                      const firstRes = group.reservations[0];
+                      const isCancelled = group.reservations.every((r) => r.status === 'cancelled');
+                      const isConfirmed = group.reservations.every((r) => r.status === 'confirmed');
+
+                      if (group.reservations.length === 1) {
+                        // Single product event
+                        const res = firstRes;
+                        const color = productColorMap[res.product_id] || '#6b7280';
+                        return (
+                          <button
+                            key={group.key}
+                            onClick={(e) => { e.stopPropagation(); setSelectedReservation(res); }}
+                            className={`w-full text-left px-1.5 py-0.5 rounded text-[10px] font-medium truncate transition-opacity ${
+                              isCancelled ? 'opacity-40 line-through' : 'opacity-90 hover:opacity-100'
+                            }`}
+                            style={{ backgroundColor: color + '20', color, borderLeft: `3px solid ${color}` }}
+                            title={`${res.products?.name || 'Produto'} - ${STATUS_LABELS[res.status]}`}
+                          >
+                            {res.products?.name || '?'}
+                            {isConfirmed && ' \u2713'}
+                          </button>
+                        );
+                      }
+
+                      // Multi-product event (grouped)
                       return (
-                        <button
-                          key={res.id}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedReservation(res);
-                          }}
-                          className={`w-full text-left px-1.5 py-0.5 rounded text-[10px] font-medium truncate transition-opacity ${
-                            isCancelled ? 'opacity-40 line-through' : 'opacity-90 hover:opacity-100'
+                        <div
+                          key={group.key}
+                          className={`w-full rounded px-1.5 py-0.5 text-[10px] transition-opacity ${
+                            isCancelled ? 'opacity-40 bg-gray-100' : 'opacity-90 bg-gray-100 hover:bg-gray-200'
                           }`}
-                          style={{
-                            backgroundColor: color + '20',
-                            color: color,
-                            borderLeft: `3px solid ${color}`,
-                          }}
-                          title={`${res.products?.name || 'Produto'} - ${STATUS_LABELS[res.status]}`}
+                          style={{ borderLeft: '3px solid #6b7280' }}
                         >
-                          {res.products?.name?.replace('Plataforma 360 ', 'P360 ').replace('Espelho Mágico ', 'EM ') || '?'}
-                          {res.status === 'confirmed' && ' \u2713'}
-                        </button>
+                          <div className="font-semibold text-gray-700 truncate">
+                            {firstRes.notes || 'Evento'}
+                            {isConfirmed && ' \u2713'}
+                          </div>
+                          <div className="flex gap-1 mt-0.5">
+                            {group.reservations.map((res) => (
+                              <button
+                                key={res.id}
+                                onClick={(e) => { e.stopPropagation(); setSelectedReservation(res); }}
+                                className="w-2.5 h-2.5 rounded-full flex-shrink-0 hover:ring-2 ring-offset-1"
+                                style={{ backgroundColor: productColorMap[res.product_id] || '#6b7280' }}
+                                title={`${res.products?.name || '?'} - ${STATUS_LABELS[res.status]}`}
+                              />
+                            ))}
+                          </div>
+                        </div>
                       );
                     })}
                   </div>
@@ -419,73 +475,87 @@ export default function ReservationsPage() {
           </div>
         ) : (
           <div className="divide-y">
-            {upcomingConfirmed.map((res) => {
-              const color = productColorMap[res.product_id] || '#6b7280';
-              const eventDate = new Date(res.event_date + 'T00:00:00');
-              const today = startOfDay(new Date());
-              const diffDays = Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-              const isUrgent = diffDays <= 7;
+            {(() => {
+              // Group upcoming by group_id
+              const groups: { key: string; date: string; notes: string | null; reservations: ReservationWithRelations[] }[] = [];
+              const seen = new Set<string>();
+              for (const res of upcomingConfirmed) {
+                if (seen.has(res.id)) continue;
+                if (res.group_id) {
+                  const siblings = upcomingConfirmed.filter((s) => s.group_id === res.group_id);
+                  siblings.forEach((s) => seen.add(s.id));
+                  groups.push({ key: res.group_id, date: res.event_date, notes: res.notes, reservations: siblings });
+                } else {
+                  seen.add(res.id);
+                  groups.push({ key: res.id, date: res.event_date, notes: res.notes, reservations: [res] });
+                }
+              }
+              return groups.map((group) => {
+                const eventDate = new Date(group.date + 'T00:00:00');
+                const today = startOfDay(new Date());
+                const diffDays = Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                const isUrgent = diffDays <= 7;
 
-              return (
-                <button
-                  key={res.id}
-                  onClick={() => setSelectedReservation(res)}
-                  className="w-full text-left p-4 hover:bg-gray-50 transition-colors flex items-center gap-4"
-                >
-                  {/* Date block */}
-                  <div className={`flex-shrink-0 w-16 h-16 rounded-lg flex flex-col items-center justify-center ${
-                    isUrgent ? 'bg-red-50 border border-red-200' : 'bg-gray-50 border border-gray-200'
-                  }`}>
-                    <span className={`text-xs font-medium uppercase ${isUrgent ? 'text-red-500' : 'text-muted-foreground'}`}>
-                      {format(eventDate, 'MMM', { locale: ptBR })}
-                    </span>
-                    <span className={`text-xl font-bold ${isUrgent ? 'text-red-700' : 'text-foreground'}`}>
-                      {format(eventDate, 'dd')}
-                    </span>
-                    <span className={`text-[10px] ${isUrgent ? 'text-red-500' : 'text-muted-foreground'}`}>
-                      {format(eventDate, 'EEE', { locale: ptBR })}
-                    </span>
-                  </div>
-
-                  {/* Details */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span
-                        className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: color }}
-                      />
-                      <span className="font-medium text-sm truncate">{res.products?.name || 'Produto'}</span>
+                return (
+                  <button
+                    key={group.key}
+                    onClick={() => setSelectedReservation(group.reservations[0])}
+                    className="w-full text-left p-4 hover:bg-gray-50 transition-colors flex items-center gap-4"
+                  >
+                    <div className={`flex-shrink-0 w-16 h-16 rounded-lg flex flex-col items-center justify-center ${
+                      isUrgent ? 'bg-red-50 border border-red-200' : 'bg-gray-50 border border-gray-200'
+                    }`}>
+                      <span className={`text-xs font-medium uppercase ${isUrgent ? 'text-red-500' : 'text-muted-foreground'}`}>
+                        {format(eventDate, 'MMM', { locale: ptBR })}
+                      </span>
+                      <span className={`text-xl font-bold ${isUrgent ? 'text-red-700' : 'text-foreground'}`}>
+                        {format(eventDate, 'dd')}
+                      </span>
+                      <span className={`text-[10px] ${isUrgent ? 'text-red-500' : 'text-muted-foreground'}`}>
+                        {format(eventDate, 'EEE', { locale: ptBR })}
+                      </span>
                     </div>
-                    <p className="text-sm text-muted-foreground truncate">
-                      {res.contacts?.name || res.contacts?.phone || 'Sem contato vinculado'}
-                    </p>
-                    {res.notes && (
-                      <p className="text-xs text-muted-foreground truncate mt-0.5">{res.notes}</p>
-                    )}
-                  </div>
 
-                  {/* Countdown */}
-                  <div className="flex-shrink-0 text-right">
-                    {diffDays === 0 ? (
-                      <span className="text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded-full">HOJE</span>
-                    ) : diffDays === 1 ? (
-                      <span className="text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded-full">AMANHA</span>
-                    ) : isUrgent ? (
-                      <span className="text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
-                        {diffDays} dias
-                      </span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">
-                        {diffDays} dias
-                      </span>
-                    )}
-                    <p className="text-[10px] text-muted-foreground mt-1">
-                      {res.created_by === 'bot' ? 'via Agente' : 'manual'}
-                    </p>
-                  </div>
-                </button>
-              );
-            })}
+                    <div className="flex-1 min-w-0">
+                      {group.notes && (
+                        <p className="font-medium text-sm truncate mb-0.5">{group.notes}</p>
+                      )}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {group.reservations.map((res) => {
+                          const color = productColorMap[res.product_id] || '#6b7280';
+                          return (
+                            <span key={res.id} className="flex items-center gap-1">
+                              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                              <span className="text-sm text-muted-foreground">{res.products?.name || 'Produto'}</span>
+                            </span>
+                          );
+                        })}
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate mt-0.5">
+                        {group.reservations[0].contacts?.name || group.reservations[0].contacts?.phone || 'Sem contato vinculado'}
+                      </p>
+                    </div>
+
+                    <div className="flex-shrink-0 text-right">
+                      {diffDays === 0 ? (
+                        <span className="text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded-full">HOJE</span>
+                      ) : diffDays === 1 ? (
+                        <span className="text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded-full">AMANHA</span>
+                      ) : isUrgent ? (
+                        <span className="text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
+                          {diffDays} dias
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">{diffDays} dias</span>
+                      )}
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        {group.reservations.length > 1 ? `${group.reservations.length} equipamentos` : group.reservations[0].created_by === 'bot' ? 'via Agente' : 'manual'}
+                      </p>
+                    </div>
+                  </button>
+                );
+              });
+            })()}
           </div>
         )}
       </div>

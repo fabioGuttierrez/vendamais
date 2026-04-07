@@ -83,7 +83,7 @@ export async function reservationRoutes(app: FastifyInstance) {
   // Create reservation (from dashboard)
   app.post('/api/v1/reservations', async (request, reply) => {
     const body = request.body as Record<string, unknown>;
-    const allowed = ['product_id', 'contact_id', 'deal_id', 'event_date', 'status', 'notes'];
+    const allowed = ['product_id', 'contact_id', 'deal_id', 'event_date', 'status', 'notes', 'group_id'];
     const filtered: Record<string, unknown> = Object.fromEntries(
       Object.entries(body).filter(([k]) => allowed.includes(k)),
     );
