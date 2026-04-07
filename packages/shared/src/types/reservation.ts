@@ -8,6 +8,7 @@ export interface Reservation {
   group_id: string | null;
   event_date: string;
   status: ReservationStatus;
+  total_value: number | null;
   notes: string | null;
   created_by: string;
   confirmed_at: string | null;

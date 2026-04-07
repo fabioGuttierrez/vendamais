@@ -58,6 +58,7 @@ export default function ReservationsPage() {
     contact_search: '',
     notes: '',
     status: 'pending' as string,
+    total_value: '',
   });
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
@@ -168,6 +169,7 @@ export default function ReservationsPage() {
               notes: createForm.notes || null,
               status: createForm.status,
               group_id: groupId,
+              total_value: createForm.total_value ? Number(createForm.total_value) : null,
             }),
           });
           results.push(newRes);
@@ -189,7 +191,7 @@ export default function ReservationsPage() {
         setCreateError(errors.join('\n'));
       } else {
         setShowCreateModal(false);
-        setCreateForm({ product_ids: [], contact_search: '', notes: '', status: 'pending' });
+        setCreateForm({ product_ids: [], contact_search: '', notes: '', status: 'pending', total_value: '' });
       }
     } finally {
       setCreating(false);
@@ -601,6 +603,14 @@ export default function ReservationsPage() {
                   {selectedReservation.created_by === 'bot' ? 'Agente IA' : 'Dashboard'}
                 </span>
               </div>
+              {selectedReservation.total_value != null && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Valor</span>
+                  <span className="text-sm font-semibold text-green-700">
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(selectedReservation.total_value)}
+                  </span>
+                </div>
+              )}
               {selectedReservation.notes && (
                 <div>
                   <span className="text-sm text-muted-foreground block mb-1">Notas</span>
@@ -758,6 +768,18 @@ export default function ReservationsPage() {
                   <option value="in_analysis">Em Análise</option>
                   <option value="confirmed">Confirmada</option>
                 </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Valor Total (R$)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={createForm.total_value}
+                  onChange={(e) => setCreateForm({ ...createForm, total_value: e.target.value })}
+                  placeholder="Ex: 2500.00"
+                  className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Notas (opcional)</label>

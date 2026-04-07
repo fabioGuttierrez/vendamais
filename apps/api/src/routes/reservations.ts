@@ -83,7 +83,7 @@ export async function reservationRoutes(app: FastifyInstance) {
   // Create reservation (from dashboard)
   app.post('/api/v1/reservations', async (request, reply) => {
     const body = request.body as Record<string, unknown>;
-    const allowed = ['product_id', 'contact_id', 'deal_id', 'event_date', 'status', 'notes', 'group_id'];
+    const allowed = ['product_id', 'contact_id', 'deal_id', 'event_date', 'status', 'notes', 'group_id', 'total_value'];
     const filtered: Record<string, unknown> = Object.fromEntries(
       Object.entries(body).filter(([k]) => allowed.includes(k)),
     );
@@ -120,7 +120,7 @@ export async function reservationRoutes(app: FastifyInstance) {
   app.patch('/api/v1/reservations/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
     const body = request.body as Record<string, unknown>;
-    const allowed = ['status', 'notes', 'cancelled_reason', 'contact_id', 'deal_id'];
+    const allowed = ['status', 'notes', 'cancelled_reason', 'contact_id', 'deal_id', 'total_value'];
     const filtered: Record<string, unknown> = Object.fromEntries(
       Object.entries(body).filter(([k]) => allowed.includes(k)),
     );
