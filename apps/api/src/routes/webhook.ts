@@ -30,6 +30,12 @@ export async function webhookRoutes(app: FastifyInstance) {
       return reply.status(200).send({ status: 'ignored', reason: 'own message' });
     }
 
+    // Ignore group messages, newsletters, and status broadcasts
+    const remoteJid = data.key?.remoteJid || '';
+    if (!remoteJid.endsWith('@s.whatsapp.net')) {
+      return reply.status(200).send({ status: 'ignored', reason: 'not a private chat' });
+    }
+
     // Extract message content
     const message = data.message;
     let content = '';
