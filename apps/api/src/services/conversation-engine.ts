@@ -369,6 +369,141 @@ async function executeToolCall(
       return { success: true, reason: input.reason };
     }
 
+    case 'check_availability': {
+      const slug = input.product_slug as string;
+      const date = input.date as string;
+
+      const { data: product } = await supabase()
+        .from('products')
+        .select('id, name, min_notice_hours')
+        .eq('slug', slug)
+        .single();
+      if (!product) return { error: `Produto não encontrado: ${slug}` };
+
+      const eventDate = new Date(date + 'T00:00:00');
+      const hoursUntil = (eventDate.getTime() - Date.now()) / (1000 * 60 * 60);
+      const minNoticeOk = !product.min_notice_hours || hoursUntil >= product.min_notice_hours;
+
+      const { data: existing } = await supabase()
+        .from('reservations')
+        .select('id, status')
+        .eq('product_id', product.id)
+        .eq('event_date', date)
+        .neq('status', 'cancelled')
+        .maybeSingle();
+
+      const result: Record<string, unknown> = {
+        available: !existing,
+        date,
+        product: product.name,
+        min_notice_ok: minNoticeOk,
+        min_notice_hours: product.min_notice_hours,
+      };
+
+      if (existing) {
+        result.existing_status = existing.status;
+      }
+
+      // If this product is unavailable, check which OTHER products are free on the SAME date
+      if (existing || !minNoticeOk) {
+        const { data: allProducts } = await supabase()
+          .from('products')
+          .select('id, name, slug')
+          .eq('active', true)
+          .neq('id', product.id);
+
+        const availableOthers: { name: string; slug: string }[] = [];
+        for (const p of allProducts || []) {
+          const { data: r } = await supabase()
+            .from('reservations')
+            .select('id')
+            .eq('product_id', p.id)
+            .eq('event_date', date)
+            .neq('status', 'cancelled')
+            .maybeSingle();
+          if (!r) availableOthers.push({ name: p.name, slug: p.slug });
+        }
+        result.other_available_products_for_same_date = availableOthers;
+      }
+
+      return result;
+    }
+
+    case 'create_reservation': {
+      const slug = input.product_slug as string;
+      const eventDateStr = input.event_date as string;
+
+      const { data: product } = await supabase()
+        .from('products')
+        .select('id, name, min_notice_hours')
+        .eq('slug', slug)
+        .single();
+      if (!product) return { error: `Produto não encontrado: ${slug}` };
+
+      const eventDate = new Date(eventDateStr + 'T00:00:00');
+      const hoursUntil = (eventDate.getTime() - Date.now()) / (1000 * 60 * 60);
+      if (product.min_notice_hours && hoursUntil < product.min_notice_hours) {
+        return {
+          success: false,
+          error: `Antecedência mínima de ${product.min_notice_hours}h não atendida`,
+        };
+      }
+
+      // Check existing reservation
+      const { data: existing } = await supabase()
+        .from('reservations')
+        .select('id, status')
+        .eq('product_id', product.id)
+        .eq('event_date', eventDateStr)
+        .neq('status', 'cancelled')
+        .maybeSingle();
+
+      if (existing) {
+        return {
+          success: false,
+          error: `Data ${eventDateStr} já está reservada para ${product.name} (status: ${existing.status})`,
+        };
+      }
+
+      // Find deal linked to this conversation
+      const { data: deal } = await supabase()
+        .from('deals')
+        .select('id')
+        .eq('conversation_id', conversation.id)
+        .limit(1)
+        .maybeSingle();
+
+      const { data: reservation, error: insertErr } = await supabase()
+        .from('reservations')
+        .insert({
+          product_id: product.id,
+          contact_id: contact.id,
+          deal_id: deal?.id || null,
+          event_date: eventDateStr,
+          status: 'pending',
+          created_by: 'bot',
+          notes: input.notes as string || null,
+        })
+        .select('id')
+        .single();
+
+      if (insertErr) {
+        if (insertErr.code === '23505') {
+          return { success: false, error: 'Data já reservada (conflito)' };
+        }
+        throw insertErr;
+      }
+
+      return {
+        success: true,
+        reservation_id: reservation?.id,
+        status: 'pending',
+        product: product.name,
+        date: eventDateStr,
+        message: 'Reserva tentativa criada. Aguardando confirmação da equipe.',
+      };
+    }
+
     default:
       return { error: `Unknown tool: ${toolName}` };
   }

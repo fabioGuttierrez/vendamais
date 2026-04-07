@@ -7,6 +7,7 @@ export type { Product } from './types/product';
 export type { FollowUp, FollowUpStatus } from './types/follow-up';
 export type { ObjectionLog, BotConfig } from './types/objection';
 export type { AgentPreset } from './types/agent-preset';
+export type { Reservation, ReservationStatus } from './types/reservation';
 export type {
   EvolutionWebhookPayload,
   EvolutionSendTextPayload,
@@ -16,6 +17,7 @@ export type {
 // Constants
 export { PIPELINE_STAGES, type PipelineStageKey } from './constants/pipeline-stages';
 export { CONVERSATION_STATES } from './constants/conversation-states';
+export { RESERVATION_STATUSES } from './constants/reservation-statuses';
 
 // Utils
 export { normalizePhone, toE164, fromRemoteJid, formatPhoneDisplay } from './utils/phone';

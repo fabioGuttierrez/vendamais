@@ -113,4 +113,48 @@ export const salesTools: Tool[] = [
       required: ['reason'],
     },
   },
+  {
+    name: 'check_availability',
+    description:
+      'Verifique a disponibilidade de um produto para uma data específica. Use SEMPRE que o cliente mencionar uma data de evento. Se o produto estiver indisponível, retorna quais outros equipamentos estão livres NAQUELA MESMA DATA.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        product_slug: {
+          type: 'string',
+          enum: ['plataforma-360-tradicional', 'plataforma-360-aerea', 'espelho-magico-fotografico'],
+          description: 'Produto a verificar',
+        },
+        date: {
+          type: 'string',
+          description: 'Data a verificar (formato YYYY-MM-DD)',
+        },
+      },
+      required: ['product_slug', 'date'],
+    },
+  },
+  {
+    name: 'create_reservation',
+    description:
+      'Crie uma reserva tentativa (pendente) para um produto em uma data. Use quando o cliente demonstrar interesse claro em reservar. A reserva será criada como "pendente" e precisará de confirmação humana.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        product_slug: {
+          type: 'string',
+          enum: ['plataforma-360-tradicional', 'plataforma-360-aerea', 'espelho-magico-fotografico'],
+          description: 'Produto a reservar',
+        },
+        event_date: {
+          type: 'string',
+          description: 'Data do evento (formato YYYY-MM-DD)',
+        },
+        notes: {
+          type: 'string',
+          description: 'Observações sobre a reserva (tipo de evento, detalhes)',
+        },
+      },
+      required: ['product_slug', 'event_date'],
+    },
+  },
 ];
