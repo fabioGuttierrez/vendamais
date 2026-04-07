@@ -7,10 +7,39 @@ import { generateResponse } from './claude-ai.js';
 import { transcribeAudio } from './audio-transcription.js';
 import { followUpQueue } from '../queues/connection.js';
 import { findPreset, DEFAULT_PRESET_ID } from '../ai/agent-presets.js';
+import { buildTrainingInsightsPrompt, type TrainingInsights } from './training-analyzer.js';
 import type { InboundMessageJob } from '../queues/message.worker.js';
 import type { FollowUpJob } from '../queues/follow-up.worker.js';
 
 const supabase = () => getSupabase();
+
+// Cache training insights for 5 minutes
+let cachedInsights: string | null = null;
+let insightsCacheTime = 0;
+const INSIGHTS_CACHE_TTL = 5 * 60 * 1000;
+
+async function getTrainingInsights(): Promise<string> {
+  if (cachedInsights !== null && Date.now() - insightsCacheTime < INSIGHTS_CACHE_TTL) {
+    return cachedInsights;
+  }
+  const { data } = await supabase()
+    .from('training_conversations')
+    .select('insights, outcome')
+    .eq('analysis_status', 'completed')
+    .not('insights', 'is', null);
+
+  if (!data || data.length === 0) {
+    cachedInsights = '';
+    insightsCacheTime = Date.now();
+    return '';
+  }
+
+  cachedInsights = buildTrainingInsightsPrompt(
+    data.map((d) => ({ insights: d.insights as TrainingInsights, outcome: d.outcome })),
+  );
+  insightsCacheTime = Date.now();
+  return cachedInsights;
+}
 
 export async function processInboundMessage(job: InboundMessageJob): Promise<void> {
   const { phoneNormalized, pushName, messageType, mediaUrl, evolutionMessageId } = job;
@@ -106,6 +135,7 @@ export async function processInboundMessage(job: InboundMessageJob): Promise<voi
   const activePresetId = (botConfigs.find((c) => c.key === 'active_agent_preset_id')?.value as string) || DEFAULT_PRESET_ID;
   const customAgentPresets = (botConfigs.find((c) => c.key === 'custom_agent_presets')?.value as AgentPreset[]) || [];
   const activePreset = findPreset(activePresetId, customAgentPresets);
+  const trainingInsights = await getTrainingInsights();
 
   // 6. Load recent messages for context (last 20)
   const { data: recentMessages } = await supabase()
@@ -130,6 +160,7 @@ export async function processInboundMessage(job: InboundMessageJob): Promise<voi
     customPrompt,
     greetingMessage,
     activePreset ? { persona: activePreset.persona, greetingStyle: activePreset.greetingStyle } : undefined,
+    trainingInsights || undefined,
   );
 
   if (!aiResponse.text) {

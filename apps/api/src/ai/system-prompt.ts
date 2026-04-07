@@ -6,6 +6,7 @@ export function buildSystemPrompt(
   customPrompt?: string,
   greetingMessage?: string,
   persona?: { persona: string; greetingStyle: string },
+  trainingInsights?: string,
 ): string {
   const qual = conversation.qualification_data as QualificationData;
   const contactName = qual.customer_name || conversation.contact.name || 'cliente';
@@ -52,6 +53,7 @@ export function buildSystemPrompt(
   ].join('\n');
 
   const customInstructions = customPrompt ? `\n## INSTRUÇÕES ADICIONAIS DO OPERADOR\n${customPrompt}\n` : '';
+  const trainingBlock = trainingInsights ? `\n${trainingInsights}\n` : '';
 
   const identityBlock = persona?.persona
     ? persona.persona
@@ -198,5 +200,5 @@ Use escalate_to_human quando:
 Ferramentas são registros internos de CRM. Elas NÃO substituem a mensagem para o cliente.
 Você SEMPRE deve terminar sua resposta com um texto para enviar ao cliente via WhatsApp.
 Nunca termine apenas com chamadas de ferramenta — o cliente precisa receber uma resposta.
-${customInstructions}`;
+${trainingBlock}${customInstructions}`;
 }

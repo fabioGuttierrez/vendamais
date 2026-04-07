@@ -13,6 +13,7 @@ import {
   Bot,
   Settings,
   Package,
+  GraduationCap,
 } from 'lucide-react';
 
 const navItems = [
@@ -24,6 +25,7 @@ const navItems = [
   { href: '/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/products', label: 'Produtos', icon: Package },
   { href: '/bot-config', label: 'Config Bot', icon: Bot },
+  { href: '/training', label: 'Treinamento', icon: GraduationCap },
   { href: '/settings', label: 'Configurações', icon: Settings },
 ];
 
