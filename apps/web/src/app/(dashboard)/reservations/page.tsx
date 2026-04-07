@@ -54,7 +54,7 @@ export default function ReservationsPage() {
 
   // Create form state
   const [createForm, setCreateForm] = useState({
-    product_id: '',
+    product_ids: [] as string[],
     contact_search: '',
     notes: '',
     status: 'pending' as string,
@@ -124,29 +124,43 @@ export default function ReservationsPage() {
   }
 
   async function handleCreateReservation() {
-    if (!createForm.product_id || !selectedDate) return;
+    if (createForm.product_ids.length === 0 || !selectedDate) return;
     setCreating(true);
     setCreateError('');
     try {
-      const newRes = await api<ReservationWithRelations>('/reservations', {
-        method: 'POST',
-        body: JSON.stringify({
-          product_id: createForm.product_id,
-          event_date: selectedDate,
-          notes: createForm.notes || null,
-          status: createForm.status,
-        }),
-      });
-      setReservations((prev) => [...prev, newRes]);
-      setShowCreateModal(false);
-      setCreateForm({ product_id: '', contact_search: '', notes: '', status: 'pending' });
-      refreshUpcoming();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Erro ao criar reserva';
-      if (msg.includes('409') || msg.includes('conflict') || msg.includes('já existe')) {
-        setCreateError('Já existe uma reserva ativa para este produto nesta data');
+      const results: ReservationWithRelations[] = [];
+      const errors: string[] = [];
+      for (const pid of createForm.product_ids) {
+        try {
+          const newRes = await api<ReservationWithRelations>('/reservations', {
+            method: 'POST',
+            body: JSON.stringify({
+              product_id: pid,
+              event_date: selectedDate,
+              notes: createForm.notes || null,
+              status: createForm.status,
+            }),
+          });
+          results.push(newRes);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : '';
+          const prodName = products.find((p) => p.id === pid)?.name || 'Produto';
+          if (msg.includes('409') || msg.includes('conflict') || msg.includes('já existe')) {
+            errors.push(`${prodName}: já tem reserva nesta data`);
+          } else {
+            errors.push(`${prodName}: ${msg || 'erro desconhecido'}`);
+          }
+        }
+      }
+      if (results.length > 0) {
+        setReservations((prev) => [...prev, ...results]);
+        refreshUpcoming();
+      }
+      if (errors.length > 0) {
+        setCreateError(errors.join('\n'));
       } else {
-        setCreateError(msg);
+        setShowCreateModal(false);
+        setCreateForm({ product_ids: [], contact_search: '', notes: '', status: 'pending' });
       }
     } finally {
       setCreating(false);
@@ -629,17 +643,39 @@ export default function ReservationsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Produto</label>
-                <select
-                  value={createForm.product_id}
-                  onChange={(e) => setCreateForm({ ...createForm, product_id: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                >
-                  <option value="">Selecione o produto</option>
-                  {products.filter((p) => p.active).map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
+                <label className="block text-sm font-medium mb-2">Produtos</label>
+                <div className="space-y-2">
+                  {products.filter((p) => p.active).map((p, i) => {
+                    const checked = createForm.product_ids.includes(p.id);
+                    return (
+                      <label
+                        key={p.id}
+                        className={`flex items-center gap-3 p-2.5 rounded-lg border-2 cursor-pointer transition-all ${
+                          checked ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => {
+                            setCreateForm((prev) => ({
+                              ...prev,
+                              product_ids: checked
+                                ? prev.product_ids.filter((id) => id !== p.id)
+                                : [...prev.product_ids, p.id],
+                            }));
+                          }}
+                          className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary/20"
+                        />
+                        <span
+                          className="w-3 h-3 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: PRODUCT_COLORS[i % PRODUCT_COLORS.length] }}
+                        />
+                        <span className="text-sm font-medium">{p.name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Status Inicial</label>
@@ -673,10 +709,10 @@ export default function ReservationsPage() {
             <div className="flex gap-2 pt-2">
               <button
                 onClick={handleCreateReservation}
-                disabled={!createForm.product_id || !selectedDate || creating}
+                disabled={createForm.product_ids.length === 0 || !selectedDate || creating}
                 className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50"
               >
-                {creating ? 'Criando...' : 'Criar Reserva'}
+                {creating ? 'Criando...' : createForm.product_ids.length > 1 ? `Criar ${createForm.product_ids.length} Reservas` : 'Criar Reserva'}
               </button>
               <button
                 onClick={() => setShowCreateModal(false)}
