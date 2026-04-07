@@ -94,7 +94,7 @@ export async function reservationRoutes(app: FastifyInstance) {
 
     filtered.created_by = 'dashboard';
 
-    const { data, error } = await supabase.from('reservations').insert(filtered).select().single();
+    const { data: inserted, error } = await supabase.from('reservations').insert(filtered).select('id').single();
 
     if (error) {
       if (error.code === '23505') {
@@ -105,6 +105,13 @@ export async function reservationRoutes(app: FastifyInstance) {
       }
       throw error;
     }
+
+    // Re-fetch with joins so frontend gets product/contact data
+    const { data } = await supabase
+      .from('reservations')
+      .select('*, products(id, name, slug), contacts(id, name, phone)')
+      .eq('id', inserted.id)
+      .single();
 
     return data;
   });
@@ -122,11 +129,11 @@ export async function reservationRoutes(app: FastifyInstance) {
     if (filtered.status === 'confirmed') filtered.confirmed_at = new Date().toISOString();
     if (filtered.status === 'cancelled') filtered.cancelled_at = new Date().toISOString();
 
-    const { data, error } = await supabase
+    const { data: updated, error } = await supabase
       .from('reservations')
       .update(filtered)
       .eq('id', id)
-      .select()
+      .select('id')
       .single();
 
     if (error) {
@@ -138,6 +145,13 @@ export async function reservationRoutes(app: FastifyInstance) {
       }
       throw error;
     }
+
+    // Re-fetch with joins
+    const { data } = await supabase
+      .from('reservations')
+      .select('*, products(id, name, slug), contacts(id, name, phone)')
+      .eq('id', updated.id)
+      .single();
 
     return data;
   });
