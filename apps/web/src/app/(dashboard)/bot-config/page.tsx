@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/utils';
+import { ChatSimulator } from '@/components/chat-simulator';
 import type { Product, AgentPreset } from '@vendamais/shared';
 
 export default function BotConfigPage() {
@@ -19,6 +20,7 @@ export default function BotConfigPage() {
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [editingPreset, setEditingPreset] = useState<AgentPreset | null>(null);
   const [customForm, setCustomForm] = useState({ name: '', description: '', persona: '', greetingStyle: '' });
+  const [showSimulator, setShowSimulator] = useState(false);
 
   useEffect(() => {
     api<Product[]>('/products').then(setProducts).catch(console.error);
@@ -127,7 +129,15 @@ export default function BotConfigPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Configuracao do Bot</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Configuracao do Bot</h1>
+        <button
+          onClick={() => setShowSimulator(true)}
+          className="px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 transition-colors"
+        >
+          Testar Agente
+        </button>
+      </div>
 
       {/* Agent Preset Selection */}
       <div className="bg-white rounded-lg border p-6 space-y-4">
@@ -356,6 +366,18 @@ export default function BotConfigPage() {
         </button>
         {saved && <span className="text-sm text-green-600">Salvo com sucesso!</span>}
       </div>
+
+      {/* Chat Simulator Modal */}
+      {showSimulator && (
+        <ChatSimulator
+          presetId={activePresetId}
+          customPresets={customPresets}
+          greetingMessage={greeting}
+          customPrompt={customPrompt}
+          presetName={allPresets.find((p) => p.id === activePresetId)?.name || 'Agente'}
+          onClose={() => setShowSimulator(false)}
+        />
+      )}
     </div>
   );
 }

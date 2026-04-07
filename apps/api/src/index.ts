@@ -12,6 +12,7 @@ import { analyticsRoutes } from './routes/analytics.js';
 import { followUpRoutes } from './routes/follow-ups.js';
 import { botConfigRoutes } from './routes/bot-config.js';
 import { productRoutes } from './routes/products.js';
+import { agentTestRoutes } from './routes/agent-test.js';
 import { startMessageWorker, stopMessageWorker } from './queues/message.worker.js';
 import { startFollowUpWorker, stopFollowUpWorker } from './queues/follow-up.worker.js';
 import { startEvolutionMonitor, stopEvolutionMonitor } from './services/evolution-monitor.js';
@@ -44,6 +45,7 @@ async function main() {
   await app.register(followUpRoutes);
   await app.register(botConfigRoutes);
   await app.register(productRoutes);
+  await app.register(agentTestRoutes);
 
   // Start workers (only if Redis is available)
   try {
