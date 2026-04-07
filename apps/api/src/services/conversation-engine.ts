@@ -1,13 +1,14 @@
 import { getSupabase } from '../config/supabase.js';
 import { logger } from '../utils/logger.js';
 import { toE164 } from '@vendamais/shared';
+import type { AgentPreset, ConversationState } from '@vendamais/shared';
 import { sendText } from './evolution-api.js';
 import { generateResponse } from './claude-ai.js';
 import { transcribeAudio } from './audio-transcription.js';
 import { followUpQueue } from '../queues/connection.js';
+import { findPreset, DEFAULT_PRESET_ID } from '../ai/agent-presets.js';
 import type { InboundMessageJob } from '../queues/message.worker.js';
 import type { FollowUpJob } from '../queues/follow-up.worker.js';
-import type { ConversationState } from '@vendamais/shared';
 
 const supabase = () => getSupabase();
 
@@ -102,6 +103,9 @@ export async function processInboundMessage(job: InboundMessageJob): Promise<voi
   const botConfigs = botConfigRes.data || [];
   const greetingMessage = botConfigs.find((c) => c.key === 'greeting_message')?.value as string | undefined;
   const customPrompt = botConfigs.find((c) => c.key === 'custom_prompt')?.value as string | undefined;
+  const activePresetId = (botConfigs.find((c) => c.key === 'active_agent_preset_id')?.value as string) || DEFAULT_PRESET_ID;
+  const customAgentPresets = (botConfigs.find((c) => c.key === 'custom_agent_presets')?.value as AgentPreset[]) || [];
+  const activePreset = findPreset(activePresetId, customAgentPresets);
 
   // 6. Load recent messages for context (last 20)
   const { data: recentMessages } = await supabase()
@@ -125,6 +129,7 @@ export async function processInboundMessage(job: InboundMessageJob): Promise<voi
     async (toolName, input) => executeToolCall(toolName, input, conversation!, contact),
     customPrompt,
     greetingMessage,
+    activePreset ? { persona: activePreset.persona, greetingStyle: activePreset.greetingStyle } : undefined,
   );
 
   if (!aiResponse.text) {

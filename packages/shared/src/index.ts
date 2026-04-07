@@ -6,6 +6,7 @@ export type { Deal, DealStage } from './types/deal';
 export type { Product } from './types/product';
 export type { FollowUp, FollowUpStatus } from './types/follow-up';
 export type { ObjectionLog, BotConfig } from './types/objection';
+export type { AgentPreset } from './types/agent-preset';
 export type {
   EvolutionWebhookPayload,
   EvolutionSendTextPayload,

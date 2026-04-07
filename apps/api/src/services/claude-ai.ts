@@ -33,8 +33,9 @@ export async function generateResponse(
   executeToolCall: (name: string, input: Record<string, unknown>) => Promise<unknown>,
   customPrompt?: string,
   greetingMessage?: string,
+  persona?: { persona: string; greetingStyle: string },
 ): Promise<AIResponse> {
-  const systemPrompt = buildSystemPrompt(conversation, products, customPrompt, greetingMessage);
+  const systemPrompt = buildSystemPrompt(conversation, products, customPrompt, greetingMessage, persona);
 
   // Build message history from recent messages
   const messages: MessageParam[] = recentMessages.map((msg) => ({

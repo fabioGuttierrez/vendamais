@@ -5,6 +5,7 @@ export function buildSystemPrompt(
   products: Product[],
   customPrompt?: string,
   greetingMessage?: string,
+  persona?: { persona: string; greetingStyle: string },
 ): string {
   const qual = conversation.qualification_data as QualificationData;
   const contactName = qual.customer_name || conversation.contact.name || 'cliente';
@@ -52,16 +53,28 @@ export function buildSystemPrompt(
 
   const customInstructions = customPrompt ? `\n## INSTRUÇÕES ADICIONAIS DO OPERADOR\n${customPrompt}\n` : '';
 
+  const identityBlock = persona?.persona
+    ? persona.persona
+    : `- Seja calorosa, profissional e entusiasmada — como uma consultora de eventos empolgada
+- Use português brasileiro natural, com "você" (nunca "tu")
+- Use no máximo 1-2 emojis por mensagem (✨, 🎉, 📸, 🎬)
+- Mantenha mensagens CURTAS (ideal para WhatsApp: 2-4 linhas)
+- Seja empática e demonstre interesse genuíno pelo evento do cliente
+- Trate o cliente pelo nome SEMPRE que souber
+- Nunca pareça robótica — converse como uma pessoa real`;
+
+  const greetingBlock = greetingMessage
+    ? `Use esta mensagem como base: "${greetingMessage}"`
+    : persona?.greetingStyle
+      ? persona.greetingStyle
+      : `Cumprimente com calor ("Oi! Que bom falar com você! 🎉")
+- Apresente-se: "Sou a assistente da Like Move 360, especialista em experiências incríveis pra eventos!"
+- Faça UMA pergunta aberta: "Me conta, você tá planejando algum evento especial?"`;
+
   return `Você é a assistente virtual de vendas da Like Move 360, empresa especializada em locação de equipamentos tecnológicos para eventos no Paraná, Brasil.
 
 ## IDENTIDADE E TOM
-- Seja calorosa, profissional e entusiasmada — como uma consultora de eventos empolgada
-- Use português brasileiro natural, com "você" (nunca "tu")
-- Use no máximo 1-2 emojis por mensagem (✨, 🎉, 📸, 🎬)
-- Mantenha mensagens CURTAS (ideal para WhatsApp: 2-4 linhas por mensagem)
-- Seja empática e demonstre interesse genuíno pelo evento do cliente
-- Trate o cliente pelo nome SEMPRE que souber
-- Nunca pareça robótica — converse como uma pessoa real
+${identityBlock}
 
 ## CONTATO DA EMPRESA
 - WhatsApp: +55 (44) 99136-6360
@@ -97,10 +110,7 @@ ${qualStatus}
 ## FLUXO DE ATENDIMENTO (SEGUIR RIGOROSAMENTE)
 
 ### 1. GREETING (Saudação)
-${greetingMessage ? `Use esta mensagem como base: "${greetingMessage}"` : ''}
-- Cumprimente com calor ("Oi! Que bom falar com você! 🎉")
-- Apresente-se: "Sou a assistente da Like Move 360, especialista em experiências incríveis pra eventos!"
-- Faça UMA pergunta aberta: "Me conta, você tá planejando algum evento especial?"
+${greetingBlock}
 - NÃO apresente produtos ainda
 
 ### 2. QUALIFICATION (Qualificação — FASE MAIS IMPORTANTE)

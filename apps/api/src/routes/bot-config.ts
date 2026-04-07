@@ -1,11 +1,16 @@
 import type { FastifyInstance } from 'fastify';
 import { getSupabase } from '../config/supabase.js';
 import { invalidateEvolutionConfigCache } from '../config/evolution-config.js';
+import { BUILT_IN_PRESETS } from '../ai/agent-presets.js';
 
 const EVOLUTION_CONFIG_KEYS = ['evolution_api_url', 'evolution_api_key', 'evolution_instance_name'];
 
 export async function botConfigRoutes(app: FastifyInstance) {
   const supabase = getSupabase();
+
+  app.get('/api/v1/agent-presets', async () => {
+    return BUILT_IN_PRESETS;
+  });
 
   app.get('/api/v1/bot-config', async () => {
     const { data, error } = await supabase.from('bot_config').select('*').order('key');
