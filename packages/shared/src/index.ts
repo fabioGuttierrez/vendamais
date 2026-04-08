@@ -18,6 +18,7 @@ export type {
 export { PIPELINE_STAGES, type PipelineStageKey } from './constants/pipeline-stages';
 export { CONVERSATION_STATES } from './constants/conversation-states';
 export { RESERVATION_STATUSES } from './constants/reservation-statuses';
+export { AI_MODEL_PRICING, DEFAULT_USD_BRL_RATE, calculateCostBRL } from './constants/ai-pricing';
 
 // Utils
 export { normalizePhone, toE164, fromRemoteJid, formatPhoneDisplay } from './utils/phone';

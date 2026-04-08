@@ -180,6 +180,8 @@ export async function processInboundMessage(job: InboundMessageJob): Promise<voi
     undefined,
     aiResponse.model,
     aiResponse.tokensUsed,
+    aiResponse.inputTokens,
+    aiResponse.outputTokens,
   );
 
   // 9. Send response via WhatsApp (retry built-in, but if it fails the message is already saved)
@@ -213,6 +215,8 @@ async function storeMessage(
   mediaType?: string,
   aiModel?: string,
   aiTokensUsed?: number,
+  aiInputTokens?: number,
+  aiOutputTokens?: number,
 ) {
   await supabase().from('messages').insert({
     conversation_id: conversationId,
@@ -225,6 +229,8 @@ async function storeMessage(
     media_type: mediaType !== 'conversation' ? mediaType : null,
     ai_model: aiModel,
     ai_tokens_used: aiTokensUsed,
+    ai_input_tokens: aiInputTokens,
+    ai_output_tokens: aiOutputTokens,
   });
 }
 
@@ -494,6 +500,19 @@ async function executeToolCall(
         throw insertErr;
       }
 
+      // Fire-and-forget: notify admin via WhatsApp
+      notifyAdminNewReservation(contact, product, eventDateStr, input.notes as string | null).catch((err) =>
+        logger.warn({ err }, 'Admin notification failed (non-blocking)')
+      );
+
+      // Auto-disable bot after successful reservation — human team takes over
+      await supabase()
+        .from('conversations')
+        .update({ is_bot_active: false })
+        .eq('id', conversation.id);
+      conversation.is_bot_active = false;
+      logger.info({ conversationId: conversation.id }, 'Bot auto-disabled after reservation created');
+
       return {
         success: true,
         reservation_id: reservation?.id,
@@ -507,4 +526,42 @@ async function executeToolCall(
     default:
       return { error: `Unknown tool: ${toolName}` };
   }
+}
+
+async function notifyAdminNewReservation(
+  contact: { name: string | null; phone: string },
+  product: { name: string },
+  eventDate: string,
+  notes: string | null,
+): Promise<void> {
+  const { data: config } = await supabase()
+    .from('bot_config')
+    .select('value')
+    .eq('key', 'admin_whatsapp_number')
+    .single();
+
+  const adminPhone = config?.value as string | undefined;
+  if (!adminPhone) {
+    logger.debug('No admin_whatsapp_number configured, skipping notification');
+    return;
+  }
+
+  const contactLabel = contact.name || contact.phone;
+  const [year, month, day] = eventDate.split('-');
+  const dateFormatted = `${day}/${month}/${year}`;
+
+  const message = [
+    `*Nova reserva pendente* (via bot)`,
+    ``,
+    `Cliente: ${contactLabel}`,
+    `Telefone: ${contact.phone}`,
+    `Produto: ${product.name}`,
+    `Data: ${dateFormatted}`,
+    notes ? `Notas: ${notes}` : null,
+    ``,
+    `Acesse o painel para confirmar ou cancelar.`,
+  ].filter(Boolean).join('\n');
+
+  await sendText(adminPhone, message);
+  logger.info({ adminPhone }, 'Admin notified of new pending reservation');
 }

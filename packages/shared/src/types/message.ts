@@ -13,6 +13,8 @@ export interface Message {
   evolution_message_id: string | null;
   ai_model: string | null;
   ai_tokens_used: number | null;
+  ai_input_tokens: number | null;
+  ai_output_tokens: number | null;
   metadata: Record<string, unknown>;
   created_at: string;
 }

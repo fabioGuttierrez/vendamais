@@ -56,7 +56,7 @@ export const salesTools: Tool[] = [
         },
         product_slug: {
           type: 'string',
-          enum: ['plataforma-360-tradicional', 'plataforma-360-aerea', 'espelho-magico-fotografico'],
+          enum: ['max360', 'spinner360', 'espelho-magico'],
           description: 'Produto de interesse',
         },
         estimated_value: { type: 'number', description: 'Valor estimado em BRL' },

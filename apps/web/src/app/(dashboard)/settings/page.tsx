@@ -18,6 +18,9 @@ export default function SettingsPage() {
   const [showKey, setShowKey] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+  const [adminPhone, setAdminPhone] = useState('');
+  const [savingPhone, setSavingPhone] = useState(false);
+  const [phoneMessage, setPhoneMessage] = useState('');
 
   useEffect(() => {
     api<{ whatsapp: { state: string } }>('/health')
@@ -31,6 +34,7 @@ export default function SettingsPage() {
         setEvolutionUrl(get('evolution_api_url') || '');
         setEvolutionKey(get('evolution_api_key') || '');
         setEvolutionInstance(get('evolution_instance_name') || '');
+        setAdminPhone((get('admin_whatsapp_number') as string) || '');
       })
       .catch(() => {});
   }, []);
@@ -66,6 +70,23 @@ export default function SettingsPage() {
     }
   }
 
+  async function saveAdminPhone() {
+    setSavingPhone(true);
+    setPhoneMessage('');
+    try {
+      await api(`/bot-config/admin_whatsapp_number`, {
+        method: 'PUT',
+        body: JSON.stringify({ value: adminPhone.trim() }),
+      });
+      setPhoneMessage('Salvo!');
+      setTimeout(() => setPhoneMessage(''), 3000);
+    } catch {
+      setPhoneMessage('Erro ao salvar.');
+    } finally {
+      setSavingPhone(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Configurações</h1>
@@ -86,6 +107,39 @@ export default function SettingsPage() {
             </>
           )}
         </div>
+      </div>
+
+      {/* Notificacoes */}
+      <div className="bg-white rounded-lg border p-6 space-y-4">
+        <h2 className="font-semibold text-lg">Notificacoes</h2>
+        <p className="text-sm text-muted-foreground">
+          Numero de WhatsApp que recebera notificacoes quando o bot criar reservas pendentes.
+        </p>
+        <div className="flex gap-3 items-end">
+          <div className="flex-1">
+            <label className="block text-sm font-medium mb-1">Numero do Admin (com DDI)</label>
+            <input
+              type="tel"
+              className="w-full rounded-md border px-3 py-2 text-sm font-mono"
+              placeholder="5544991366360"
+              value={adminPhone}
+              onChange={(e) => setAdminPhone(e.target.value)}
+            />
+          </div>
+          <button
+            className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
+            onClick={saveAdminPhone}
+            disabled={savingPhone}
+          >
+            {savingPhone ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Salvar
+          </button>
+        </div>
+        {phoneMessage && (
+          <span className={`text-sm ${phoneMessage.includes('Erro') ? 'text-red-600' : 'text-green-600'}`}>
+            {phoneMessage}
+          </span>
+        )}
       </div>
 
       {/* Evolution API Config */}

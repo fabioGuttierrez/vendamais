@@ -22,6 +22,8 @@ export interface AIResponse {
   text: string;
   toolCalls: ToolCallResult[];
   tokensUsed: number;
+  inputTokens: number;
+  outputTokens: number;
   model: string;
 }
 
@@ -48,7 +50,8 @@ export async function generateResponse(
   messages.push({ role: 'user', content: inboundText });
 
   const allToolCalls: ToolCallResult[] = [];
-  let totalTokens = 0;
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
   const model = 'claude-sonnet-4-20250514';
 
   let response = await anthropic.messages.create({
@@ -59,7 +62,8 @@ export async function generateResponse(
     tools: salesTools,
   });
 
-  totalTokens += (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
+  totalInputTokens += response.usage?.input_tokens || 0;
+  totalOutputTokens += response.usage?.output_tokens || 0;
 
   // Tool calling loop
   while (response.stop_reason === 'tool_use') {
@@ -102,7 +106,8 @@ export async function generateResponse(
       tools: salesTools,
     });
 
-    totalTokens += (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
+    totalInputTokens += response.usage?.input_tokens || 0;
+    totalOutputTokens += response.usage?.output_tokens || 0;
   }
 
   // Extract text response
@@ -124,10 +129,18 @@ export async function generateResponse(
       messages,
       tools: salesTools,
     });
-    totalTokens += (nudgeResponse.usage?.input_tokens || 0) + (nudgeResponse.usage?.output_tokens || 0);
+    totalInputTokens += nudgeResponse.usage?.input_tokens || 0;
+    totalOutputTokens += nudgeResponse.usage?.output_tokens || 0;
     const nudgeText = nudgeResponse.content.find((b): b is ContentBlock & { type: 'text' } => b.type === 'text');
     text = nudgeText?.text ?? '';
   }
 
-  return { text, toolCalls: allToolCalls, tokensUsed: totalTokens, model };
+  return {
+    text,
+    toolCalls: allToolCalls,
+    tokensUsed: totalInputTokens + totalOutputTokens,
+    inputTokens: totalInputTokens,
+    outputTokens: totalOutputTokens,
+    model,
+  };
 }
