@@ -6,12 +6,14 @@ export async function conversationRoutes(app: FastifyInstance) {
 
   // List conversations
   app.get('/api/v1/conversations', async (request) => {
-    const { state, active_only = 'true' } = request.query as Record<string, string>;
+    const { state, active_only = 'true', page = '1', limit = '30' } = request.query as Record<string, string>;
+    const offset = (parseInt(page) - 1) * parseInt(limit);
 
     let query = supabase
       .from('conversations')
-      .select('*, contacts(id, name, phone, phone_normalized)')
-      .order('last_message_at', { ascending: false, nullsFirst: false });
+      .select('*, contacts(id, name, phone, phone_normalized)', { count: 'exact' })
+      .order('last_message_at', { ascending: false, nullsFirst: false })
+      .range(offset, offset + parseInt(limit) - 1);
 
     if (state) {
       query = query.eq('state', state);
@@ -20,9 +22,9 @@ export async function conversationRoutes(app: FastifyInstance) {
       query = query.not('state', 'in', '("completed","lost")');
     }
 
-    const { data, error } = await query;
+    const { data, count, error } = await query;
     if (error) throw error;
-    return data;
+    return { data, total: count, page: parseInt(page), limit: parseInt(limit) };
   });
 
   // Get conversation with messages

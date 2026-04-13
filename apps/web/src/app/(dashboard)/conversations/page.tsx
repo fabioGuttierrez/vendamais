@@ -22,8 +22,8 @@ export default function ConversationsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api<ConversationWithContact[]>('/conversations')
-      .then(setConversations)
+    api<{ data: ConversationWithContact[]; total: number }>('/conversations')
+      .then((res) => setConversations(res.data))
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);

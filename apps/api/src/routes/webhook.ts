@@ -1,20 +1,25 @@
 import type { FastifyInstance } from 'fastify';
 import { fromRemoteJid, normalizePhone } from '@vendamais/shared';
+import { timingSafeEqual } from 'node:crypto';
 import { env } from '../config/env.js';
 import { messageQueue } from '../queues/connection.js';
 import { logger } from '../utils/logger.js';
 import type { InboundMessageJob } from '../queues/message.worker.js';
 
+function safeCompare(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+}
+
 export async function webhookRoutes(app: FastifyInstance) {
   app.post('/api/v1/webhook/evolution', async (request, reply) => {
-    // Verify webhook secret (header or query param)
-    const query = request.query as Record<string, string>;
+    // Verify webhook secret (header only — never accept via query string)
     const apiKey =
       (request.headers['apikey'] as string) ||
       (request.headers['x-webhook-secret'] as string) ||
-      query.secret;
-    if (apiKey !== env.WEBHOOK_SECRET) {
-      logger.warn({ receivedKey: apiKey ?? '(none)', headers: Object.keys(request.headers) }, 'Webhook auth failed');
+      '';
+    if (!apiKey || !safeCompare(apiKey, env.WEBHOOK_SECRET)) {
+      logger.warn('Webhook auth failed');
       return reply.status(401).send({ error: 'Unauthorized' });
     }
 

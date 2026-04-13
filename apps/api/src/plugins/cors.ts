@@ -6,7 +6,7 @@ export async function registerCors(app: FastifyInstance) {
     origin: [
       'http://localhost:3000',
       'http://localhost:3001',
-      /\.vercel\.app$/,
+      /^https:\/\/vendamais[a-z0-9-]*\.vercel\.app$/,
       /\.likemove360\.com\.br$/,
       /\.bildee\.com\.br$/,
       'https://vendamais.bildee.com.br',

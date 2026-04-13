@@ -1,5 +1,18 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { createClient } from '@supabase/supabase-js';
 import { env } from '../config/env.js';
+import { logger } from '../utils/logger.js';
+
+// Dedicated client for JWT verification (uses service_role to call auth.getUser)
+let authClient: ReturnType<typeof createClient> | null = null;
+function getAuthClient() {
+  if (!authClient) {
+    authClient = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+  }
+  return authClient;
+}
 
 export async function registerAuth(app: FastifyInstance) {
   app.decorate('verifyWebhook', async (request: FastifyRequest, reply: FastifyReply) => {
@@ -14,7 +27,16 @@ export async function registerAuth(app: FastifyInstance) {
     if (!authHeader?.startsWith('Bearer ')) {
       return reply.status(401).send({ error: 'Missing authorization header' });
     }
-    // Token is validated by Supabase on the dashboard side
-    // API trusts service_role for data operations
+
+    const token = authHeader.slice(7);
+    const { data, error } = await getAuthClient().auth.getUser(token);
+
+    if (error || !data.user) {
+      logger.warn({ error: error?.message }, 'Dashboard auth failed');
+      return reply.status(401).send({ error: 'Invalid or expired token' });
+    }
+
+    // Attach user to request for downstream use
+    (request as any).user = data.user;
   });
 }

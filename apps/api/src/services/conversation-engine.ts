@@ -143,7 +143,7 @@ export async function processInboundMessage(job: InboundMessageJob): Promise<voi
     .select('*')
     .eq('conversation_id', conversation.id)
     .order('created_at', { ascending: true })
-    .limit(20);
+    .limit(10);
 
   // 7. Generate AI response
   const conversationWithContact = {
@@ -151,17 +151,57 @@ export async function processInboundMessage(job: InboundMessageJob): Promise<voi
     contact: { name: contact.name, phone: contact.phone },
   };
 
-  const aiResponse = await generateResponse(
-    conversationWithContact,
-    products || [],
-    (recentMessages || []).slice(0, -1), // exclude current inbound (we pass it separately)
-    content,
-    async (toolName, input) => executeToolCall(toolName, input, conversation!, contact),
-    customPrompt,
-    greetingMessage,
-    activePreset ? { persona: activePreset.persona, greetingStyle: activePreset.greetingStyle } : undefined,
-    trainingInsights || undefined,
-  );
+  let aiResponse;
+  try {
+    aiResponse = await generateResponse(
+      conversationWithContact,
+      products || [],
+      (recentMessages || []).slice(0, -1), // exclude current inbound (we pass it separately)
+      content,
+      async (toolName, input) => executeToolCall(toolName, input, conversation!, contact),
+      customPrompt,
+      greetingMessage,
+      activePreset ? { persona: activePreset.persona, greetingStyle: activePreset.greetingStyle } : undefined,
+      trainingInsights || undefined,
+    );
+  } catch (aiError: any) {
+    const errorMessage = aiError?.message || '';
+    const statusCode = aiError?.status || aiError?.statusCode || 0;
+
+    const isCreditsExhausted = statusCode === 402 || statusCode === 429
+      || errorMessage.includes('credit')
+      || errorMessage.includes('billing')
+      || errorMessage.includes('rate_limit')
+      || errorMessage.includes('overloaded');
+
+    logger.error({ phone, error: errorMessage, statusCode }, 'AI generation failed');
+
+    // Send friendly fallback to customer
+    const fallbackText = 'Oi! No momento nosso atendimento automatico esta temporariamente indisponivel. '
+      + 'Mas fique tranquilo, nossa equipe ja foi avisada e vai te responder em breve! 😊';
+
+    await storeMessage(conversation.id, contact.id, fallbackText, 'outbound', 'bot');
+
+    try {
+      await sendText(phoneNormalized, fallbackText);
+    } catch (sendErr) {
+      logger.error({ phone, sendErr }, 'Failed to send AI-error fallback message');
+    }
+
+    // Disable bot on this conversation so the customer doesn't keep hitting the error
+    await supabase()
+      .from('conversations')
+      .update({ is_bot_active: false })
+      .eq('id', conversation.id);
+
+    // Notify admin via WhatsApp
+    const reason = isCreditsExhausted ? 'Creditos da IA esgotados ou limite atingido' : `Erro na IA: ${errorMessage.slice(0, 100)}`;
+    notifyAdminAIFailure(contact, reason).catch((err) =>
+      logger.warn({ err }, 'Failed to notify admin about AI failure'),
+    );
+
+    return; // Don't rethrow — message is saved, customer is informed, admin notified
+  }
 
   if (!aiResponse.text) {
     logger.warn({ phone }, 'AI returned empty response');
@@ -182,6 +222,8 @@ export async function processInboundMessage(job: InboundMessageJob): Promise<voi
     aiResponse.tokensUsed,
     aiResponse.inputTokens,
     aiResponse.outputTokens,
+    aiResponse.cacheReadTokens,
+    aiResponse.cacheCreationTokens,
   );
 
   // 9. Send response via WhatsApp (retry built-in, but if it fails the message is already saved)
@@ -217,6 +259,8 @@ async function storeMessage(
   aiTokensUsed?: number,
   aiInputTokens?: number,
   aiOutputTokens?: number,
+  aiCacheReadTokens?: number,
+  aiCacheCreationTokens?: number,
 ) {
   await supabase().from('messages').insert({
     conversation_id: conversationId,
@@ -231,6 +275,8 @@ async function storeMessage(
     ai_tokens_used: aiTokensUsed,
     ai_input_tokens: aiInputTokens,
     ai_output_tokens: aiOutputTokens,
+    ai_cache_read_tokens: aiCacheReadTokens,
+    ai_cache_creation_tokens: aiCacheCreationTokens,
   });
 }
 
@@ -564,4 +610,32 @@ async function notifyAdminNewReservation(
 
   await sendText(adminPhone, message);
   logger.info({ adminPhone }, 'Admin notified of new pending reservation');
+}
+
+async function notifyAdminAIFailure(
+  contact: { name: string | null; phone: string },
+  reason: string,
+): Promise<void> {
+  const { data: config } = await supabase()
+    .from('bot_config')
+    .select('value')
+    .eq('key', 'admin_whatsapp_number')
+    .single();
+
+  const adminPhone = config?.value as string | undefined;
+  if (!adminPhone) return;
+
+  const contactLabel = contact.name || contact.phone;
+  const message = [
+    `*⚠️ Bot desativado automaticamente*`,
+    ``,
+    `Motivo: ${reason}`,
+    `Cliente: ${contactLabel} (${contact.phone})`,
+    ``,
+    `O bot foi desativado nesta conversa. O cliente recebeu uma mensagem de espera.`,
+    `Responda manualmente ou reative o bot no painel.`,
+  ].join('\n');
+
+  await sendText(adminPhone, message);
+  logger.info({ adminPhone }, 'Admin notified of AI failure');
 }

@@ -74,23 +74,18 @@ export async function analyticsRoutes(app: FastifyInstance) {
   });
 
   app.get('/api/v1/analytics/messages-daily', async () => {
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabase
+      .from('analytics_daily_messages')
+      .select('day, inbound, outbound');
 
-    const { data } = await supabase
-      .from('messages')
-      .select('direction, created_at')
-      .gte('created_at', thirtyDaysAgo);
+    if (error) throw error;
 
-    const daily: Record<string, { inbound: number; outbound: number }> = {};
-    for (const msg of data || []) {
-      const day = msg.created_at.slice(0, 10);
-      if (!daily[day]) daily[day] = { inbound: 0, outbound: 0 };
-      daily[day][msg.direction as 'inbound' | 'outbound']++;
-    }
-
-    return Object.entries(daily)
-      .map(([day, counts]) => ({ day, ...counts, total: counts.inbound + counts.outbound }))
-      .sort((a, b) => b.day.localeCompare(a.day));
+    return (data || []).map((row: any) => ({
+      day: row.day,
+      inbound: Number(row.inbound),
+      outbound: Number(row.outbound),
+      total: Number(row.inbound) + Number(row.outbound),
+    })).sort((a: any, b: any) => b.day.localeCompare(a.day));
   });
 
   app.get('/api/v1/analytics/pending-reservations', async () => {
@@ -116,17 +111,21 @@ export async function analyticsRoutes(app: FastifyInstance) {
       .single();
     const usdBrlRate = (rateConfig?.value as number) || DEFAULT_USD_BRL_RATE;
 
-    // Query messages with AI tokens, grouped by conversation
+    // Query messages with AI tokens from last 90 days
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
     const { data: messages } = await supabase
       .from('messages')
-      .select('conversation_id, ai_model, ai_input_tokens, ai_output_tokens')
-      .not('ai_input_tokens', 'is', null);
+      .select('conversation_id, ai_model, ai_input_tokens, ai_output_tokens, ai_cache_read_tokens, ai_cache_creation_tokens')
+      .not('ai_input_tokens', 'is', null)
+      .gte('created_at', ninetyDaysAgo);
 
-    const costMap = new Map<string, { inputTokens: number; outputTokens: number; model: string; messageCount: number }>();
+    const costMap = new Map<string, { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheCreationTokens: number; model: string; messageCount: number }>();
     for (const msg of messages || []) {
-      const existing = costMap.get(msg.conversation_id) || { inputTokens: 0, outputTokens: 0, model: msg.ai_model || '', messageCount: 0 };
+      const existing = costMap.get(msg.conversation_id) || { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, model: msg.ai_model || '', messageCount: 0 };
       existing.inputTokens += msg.ai_input_tokens || 0;
       existing.outputTokens += msg.ai_output_tokens || 0;
+      existing.cacheReadTokens += msg.ai_cache_read_tokens || 0;
+      existing.cacheCreationTokens += msg.ai_cache_creation_tokens || 0;
       existing.messageCount++;
       if (msg.ai_model) existing.model = msg.ai_model;
       costMap.set(msg.conversation_id, existing);
@@ -151,7 +150,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
     const results = conversationIds.map((convId) => {
       const tokens = costMap.get(convId)!;
       const conv = convMap.get(convId) as any;
-      const costBrl = calculateCostBRL(tokens.inputTokens, tokens.outputTokens, tokens.model, usdBrlRate);
+      const costBrl = calculateCostBRL(tokens.inputTokens, tokens.outputTokens, tokens.model, usdBrlRate, tokens.cacheReadTokens, tokens.cacheCreationTokens);
       totalCostBrl += costBrl;
       totalInputTokens += tokens.inputTokens;
       totalOutputTokens += tokens.outputTokens;

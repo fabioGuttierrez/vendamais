@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import toast from 'react-hot-toast';
 import { api } from '@/lib/utils';
 import {
   startOfMonth,
@@ -56,12 +57,14 @@ export default function ReservationsPage() {
   const [createForm, setCreateForm] = useState({
     product_ids: [] as string[],
     contact_search: '',
+    contact_id: null as string | null,
     notes: '',
     status: 'pending' as string,
     total_value: '',
   });
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
+  const [contactResults, setContactResults] = useState<{ id: string; name: string | null; phone: string }[]>([]);
 
   // Cancel modal
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -170,6 +173,7 @@ export default function ReservationsPage() {
               status: createForm.status,
               group_id: groupId,
               total_value: createForm.total_value ? Number(createForm.total_value) : null,
+              contact_id: createForm.contact_id || null,
             }),
           });
           results.push(newRes);
@@ -186,12 +190,13 @@ export default function ReservationsPage() {
       if (results.length > 0) {
         setReservations((prev) => [...prev, ...results]);
         refreshUpcoming();
+        toast.success('Reserva criada!');
       }
       if (errors.length > 0) {
         setCreateError(errors.join('\n'));
       } else {
         setShowCreateModal(false);
-        setCreateForm({ product_ids: [], contact_search: '', notes: '', status: 'pending', total_value: '' });
+        setCreateForm({ product_ids: [], contact_search: '', contact_id: null, notes: '', status: 'pending', total_value: '' });
       }
     } finally {
       setCreating(false);
@@ -213,8 +218,10 @@ export default function ReservationsPage() {
       setShowCancelModal(false);
       setCancelReason('');
       refreshUpcoming();
+      toast.success('Status atualizado!');
     } catch (err) {
       console.error('Failed to update reservation:', err);
+      toast.error('Erro ao atualizar reserva');
     }
   }
 
@@ -223,8 +230,10 @@ export default function ReservationsPage() {
       await api(`/reservations/${id}`, { method: 'DELETE' });
       setReservations((prev) => prev.filter((r) => r.id !== id));
       setSelectedReservation(null);
+      toast.success('Reserva excluída');
     } catch (err) {
       console.error('Failed to delete reservation:', err);
+      toast.error('Erro ao excluir reserva');
     }
   }
 
@@ -768,6 +777,61 @@ export default function ReservationsPage() {
                   <option value="in_analysis">Em Análise</option>
                   <option value="confirmed">Confirmada</option>
                 </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Contato (opcional)</label>
+                {createForm.contact_id ? (
+                  <div className="flex items-center gap-2 p-2 border rounded-md bg-gray-50">
+                    <span className="text-sm flex-1">
+                      {contactResults.find((c) => c.id === createForm.contact_id)?.name ||
+                        contactResults.find((c) => c.id === createForm.contact_id)?.phone || 'Contato selecionado'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setCreateForm({ ...createForm, contact_id: null, contact_search: '' })}
+                      className="text-xs text-red-500 hover:text-red-700"
+                    >
+                      Remover
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={createForm.contact_search}
+                      onChange={(e) => {
+                        const q = e.target.value;
+                        setCreateForm({ ...createForm, contact_search: q });
+                        if (q.length >= 2) {
+                          api<{ data: { id: string; name: string | null; phone: string }[] }>(`/contacts?search=${encodeURIComponent(q)}&limit=5`)
+                            .then((res) => setContactResults(res.data || []))
+                            .catch(() => setContactResults([]));
+                        } else {
+                          setContactResults([]);
+                        }
+                      }}
+                      placeholder="Buscar por nome ou telefone..."
+                      className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                    {contactResults.length > 0 && createForm.contact_search.length >= 2 && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-40 overflow-y-auto">
+                        {contactResults.map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => {
+                              setCreateForm({ ...createForm, contact_id: c.id, contact_search: '' });
+                            }}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 border-b last:border-0"
+                          >
+                            <span className="font-medium">{c.name || 'Sem nome'}</span>
+                            <span className="text-muted-foreground ml-2">{c.phone}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Valor Total (R$)</label>

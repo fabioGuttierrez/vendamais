@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 import { api, cn } from '@/lib/utils';
 import { PIPELINE_STAGES, formatBRL } from '@vendamais/shared';
 import type { Deal } from '@vendamais/shared';
@@ -12,18 +13,23 @@ export default function PipelinePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api<DealWithRelations[]>('/deals')
-      .then(setDeals)
+    api<{ data: DealWithRelations[]; total: number }>('/deals')
+      .then((res) => setDeals(res.data))
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
 
   async function handleStageChange(dealId: string, newStage: string) {
-    await api(`/deals/${dealId}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ stage: newStage }),
-    });
-    setDeals((prev) => prev.map((d) => (d.id === dealId ? { ...d, stage: newStage as any } : d)));
+    try {
+      await api(`/deals/${dealId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ stage: newStage }),
+      });
+      setDeals((prev) => prev.map((d) => (d.id === dealId ? { ...d, stage: newStage as any } : d)));
+      toast.success('Deal atualizado');
+    } catch (err) {
+      toast.error('Erro ao atualizar deal');
+    }
   }
 
   if (loading) return <div className="animate-pulse"><div className="h-96 bg-muted rounded-lg" /></div>;

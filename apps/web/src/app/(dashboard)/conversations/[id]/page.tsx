@@ -9,6 +9,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import Link from 'next/link';
 import { Bot, User, Send, ArrowLeft } from 'lucide-react';
+import toast from 'react-hot-toast';
 import type { Message, Conversation, Contact } from '@vendamais/shared';
 
 export default function ConversationDetailPage() {
@@ -66,8 +67,10 @@ export default function ConversationDetailPage() {
         body: JSON.stringify({ conversation_id: params.id, content: newMessage }),
       });
       setNewMessage('');
+      toast.success('Mensagem enviada');
     } catch (err) {
       console.error(err);
+      toast.error('Erro ao enviar mensagem');
     } finally {
       setSending(false);
     }
@@ -84,6 +87,7 @@ export default function ConversationDetailPage() {
       }),
     });
     setConversation({ ...conversation, is_bot_active: newActive, state: newActive ? 'greeting' : 'human_takeover' });
+    toast.success('Bot atualizado');
   }
 
   if (!conversation) return <div className="animate-pulse"><div className="h-96 bg-muted rounded-lg" /></div>;

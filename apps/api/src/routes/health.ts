@@ -29,7 +29,10 @@ export async function healthRoutes(app: FastifyInstance) {
       },
     };
   });
+}
 
+/** Debug endpoint — registered inside auth-protected scope */
+export async function healthDebugRoutes(app: FastifyInstance) {
   app.get('/api/v1/health/debug', async () => {
     const results: Record<string, unknown> = {
       timestamp: new Date().toISOString(),

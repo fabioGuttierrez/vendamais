@@ -1,9 +1,10 @@
 import Fastify from 'fastify';
+import rateLimit from '@fastify/rate-limit';
 import { env } from './config/env.js';
 import { registerCors } from './plugins/cors.js';
 import { registerAuth } from './plugins/auth.js';
 import { webhookRoutes } from './routes/webhook.js';
-import { healthRoutes } from './routes/health.js';
+import { healthRoutes, healthDebugRoutes } from './routes/health.js';
 import { contactRoutes } from './routes/contacts.js';
 import { conversationRoutes } from './routes/conversations.js';
 import { messageRoutes } from './routes/messages.js';
@@ -37,20 +38,33 @@ async function main() {
   await registerAuth(app);
   await app.register(import('@fastify/multipart'), { limits: { fileSize: 10 * 1024 * 1024 } });
 
-  // Routes
+  // Global rate limit (per IP)
+  await app.register(rateLimit, {
+    max: 100,
+    timeWindow: '1 minute',
+  });
+
+  // Public routes (no auth required)
   await app.register(webhookRoutes);
   await app.register(healthRoutes);
-  await app.register(contactRoutes);
-  await app.register(conversationRoutes);
-  await app.register(messageRoutes);
-  await app.register(dealRoutes);
-  await app.register(analyticsRoutes);
-  await app.register(followUpRoutes);
-  await app.register(botConfigRoutes);
-  await app.register(productRoutes);
-  await app.register(agentTestRoutes);
-  await app.register(trainingRoutes);
-  await app.register(reservationRoutes);
+
+  // Dashboard routes (JWT auth required)
+  await app.register(async function dashboardRoutes(scoped) {
+    scoped.addHook('onRequest', (scoped as any).verifyDashboard);
+
+    await scoped.register(healthDebugRoutes);
+    await scoped.register(contactRoutes);
+    await scoped.register(conversationRoutes);
+    await scoped.register(messageRoutes);
+    await scoped.register(dealRoutes);
+    await scoped.register(analyticsRoutes);
+    await scoped.register(followUpRoutes);
+    await scoped.register(botConfigRoutes);
+    await scoped.register(productRoutes);
+    await scoped.register(agentTestRoutes);
+    await scoped.register(trainingRoutes);
+    await scoped.register(reservationRoutes);
+  });
 
   // Start workers (only if Redis is available)
   try {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/utils';
 import { formatPhoneDisplay } from '@vendamais/shared';
@@ -10,15 +10,23 @@ import type { Contact } from '@vendamais/shared';
 export default function ContactsPage() {
   const [contacts, setContacts] = useState<(Contact & { deals?: any[] })[]>([]);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  function handleSearchChange(value: string) {
+    setSearch(value);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setDebouncedSearch(value), 350);
+  }
 
   useEffect(() => {
-    const params = search ? `?search=${encodeURIComponent(search)}` : '';
+    const params = debouncedSearch ? `?search=${encodeURIComponent(debouncedSearch)}` : '';
     api<{ data: any[] }>(`/contacts${params}`)
       .then((res) => setContacts(res.data))
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [search]);
+  }, [debouncedSearch]);
 
   return (
     <div className="space-y-6">
@@ -30,7 +38,7 @@ export default function ContactsPage() {
             type="text"
             placeholder="Buscar contatos..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-9 pr-4 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           />
         </div>

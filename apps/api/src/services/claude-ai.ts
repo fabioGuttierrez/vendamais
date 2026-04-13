@@ -2,11 +2,14 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { MessageParam, ContentBlock, ToolUseBlock, ToolResultBlockParam } from '@anthropic-ai/sdk/resources/messages.js';
 import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
-import { salesTools } from '../ai/tools.js';
+import { buildSalesTools } from '../ai/tools.js';
 import { buildSystemPrompt } from '../ai/system-prompt.js';
 import type { Conversation, Product, Message } from '@vendamais/shared';
 
-const anthropic = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+const anthropic = new Anthropic({
+  apiKey: env.ANTHROPIC_API_KEY,
+  timeout: 60_000, // 60s timeout per API call
+});
 
 interface ConversationWithContact extends Conversation {
   contact: { name: string | null; phone: string };
@@ -24,6 +27,8 @@ export interface AIResponse {
   tokensUsed: number;
   inputTokens: number;
   outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
   model: string;
 }
 
@@ -40,6 +45,18 @@ export async function generateResponse(
 ): Promise<AIResponse> {
   const systemPrompt = buildSystemPrompt(conversation, products, customPrompt, greetingMessage, persona, trainingInsights);
 
+  const tools = buildSalesTools(products.filter(p => p.active).map(p => p.slug));
+
+  // Add cache_control to the last tool so the entire tools array is cached
+  const toolsWithCache = tools.map((tool, i) =>
+    i === tools.length - 1 ? { ...tool, cache_control: { type: 'ephemeral' as const } } : tool,
+  );
+
+  // System prompt as cacheable content block
+  const systemWithCache = [
+    { type: 'text' as const, text: systemPrompt, cache_control: { type: 'ephemeral' as const } },
+  ];
+
   // Build message history from recent messages
   const messages: MessageParam[] = recentMessages.map((msg) => ({
     role: msg.direction === 'inbound' ? ('user' as const) : ('assistant' as const),
@@ -52,18 +69,22 @@ export async function generateResponse(
   const allToolCalls: ToolCallResult[] = [];
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
+  let totalCacheReadTokens = 0;
+  let totalCacheCreationTokens = 0;
   const model = 'claude-sonnet-4-20250514';
 
   let response = await anthropic.messages.create({
     model,
     max_tokens: 1024,
-    system: systemPrompt,
+    system: systemWithCache,
     messages,
-    tools: salesTools,
+    tools: toolsWithCache,
   });
 
   totalInputTokens += response.usage?.input_tokens || 0;
   totalOutputTokens += response.usage?.output_tokens || 0;
+  totalCacheReadTokens += (response.usage as any)?.cache_read_input_tokens || 0;
+  totalCacheCreationTokens += (response.usage as any)?.cache_creation_input_tokens || 0;
 
   // Tool calling loop
   while (response.stop_reason === 'tool_use') {
@@ -101,13 +122,15 @@ export async function generateResponse(
     response = await anthropic.messages.create({
       model,
       max_tokens: 1024,
-      system: systemPrompt,
+      system: systemWithCache,
       messages,
-      tools: salesTools,
+      tools: toolsWithCache,
     });
 
     totalInputTokens += response.usage?.input_tokens || 0;
     totalOutputTokens += response.usage?.output_tokens || 0;
+    totalCacheReadTokens += (response.usage as any)?.cache_read_input_tokens || 0;
+    totalCacheCreationTokens += (response.usage as any)?.cache_creation_input_tokens || 0;
   }
 
   // Extract text response
@@ -125,15 +148,22 @@ export async function generateResponse(
     const nudgeResponse = await anthropic.messages.create({
       model,
       max_tokens: 1024,
-      system: systemPrompt,
+      system: systemWithCache,
       messages,
-      tools: salesTools,
+      tools: toolsWithCache,
     });
     totalInputTokens += nudgeResponse.usage?.input_tokens || 0;
     totalOutputTokens += nudgeResponse.usage?.output_tokens || 0;
+    totalCacheReadTokens += (nudgeResponse.usage as any)?.cache_read_input_tokens || 0;
+    totalCacheCreationTokens += (nudgeResponse.usage as any)?.cache_creation_input_tokens || 0;
     const nudgeText = nudgeResponse.content.find((b): b is ContentBlock & { type: 'text' } => b.type === 'text');
     text = nudgeText?.text ?? '';
   }
+
+  logger.info(
+    { cacheRead: totalCacheReadTokens, cacheCreation: totalCacheCreationTokens, input: totalInputTokens, output: totalOutputTokens },
+    'AI token usage',
+  );
 
   return {
     text,
@@ -141,6 +171,8 @@ export async function generateResponse(
     tokensUsed: totalInputTokens + totalOutputTokens,
     inputTokens: totalInputTokens,
     outputTokens: totalOutputTokens,
+    cacheReadTokens: totalCacheReadTokens,
+    cacheCreationTokens: totalCacheCreationTokens,
     model,
   };
 }

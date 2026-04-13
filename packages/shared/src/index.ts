@@ -8,6 +8,7 @@ export type { FollowUp, FollowUpStatus } from './types/follow-up';
 export type { ObjectionLog, BotConfig } from './types/objection';
 export type { AgentPreset } from './types/agent-preset';
 export type { Reservation, ReservationStatus } from './types/reservation';
+export type { TrainingConversation, TrainingInsights, ParsedMessage } from './types/training-conversation';
 export type {
   EvolutionWebhookPayload,
   EvolutionSendTextPayload,

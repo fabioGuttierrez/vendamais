@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 import { api } from '@/lib/utils';
 import { ChatSimulator } from '@/components/chat-simulator';
 import type { Product, AgentPreset } from '@vendamais/shared';
@@ -151,6 +152,7 @@ export default function BotConfigPage() {
         api('/bot-config/bot_default_active', { method: 'PUT', body: JSON.stringify({ value: botDefaultActive }) }),
       ]);
       setSaved(true);
+      toast.success('Configurações salvas!');
       setTimeout(() => setSaved(false), 2000);
     } finally {
       setSaving(false);

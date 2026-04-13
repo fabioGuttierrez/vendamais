@@ -6,20 +6,22 @@ export async function dealRoutes(app: FastifyInstance) {
 
   // List deals (pipeline view)
   app.get('/api/v1/deals', async (request) => {
-    const { stage } = request.query as Record<string, string>;
+    const { stage, page = '1', limit = '50' } = request.query as Record<string, string>;
+    const offset = (parseInt(page) - 1) * parseInt(limit);
 
     let query = supabase
       .from('deals')
-      .select('*, contacts(id, name, phone, event_type), products(name, slug)')
-      .order('updated_at', { ascending: false });
+      .select('*, contacts(id, name, phone, event_type), products(name, slug)', { count: 'exact' })
+      .order('updated_at', { ascending: false })
+      .range(offset, offset + parseInt(limit) - 1);
 
     if (stage) {
       query = query.eq('stage', stage);
     }
 
-    const { data, error } = await query;
+    const { data, count, error } = await query;
     if (error) throw error;
-    return data;
+    return { data, total: count, page: parseInt(page), limit: parseInt(limit) };
   });
 
   // Update deal (stage change from Kanban drag)

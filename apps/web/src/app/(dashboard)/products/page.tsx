@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import toast from 'react-hot-toast';
 import { api } from '@/lib/utils';
 import { Plus, Edit2, Trash2, Youtube, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 
@@ -132,6 +133,7 @@ export default function ProductsPage() {
       }
       cancelEdit();
       load();
+      toast.success(editing === 'new' ? 'Produto criado!' : 'Produto atualizado!');
     } finally {
       setSaving(false);
     }
@@ -150,6 +152,7 @@ export default function ProductsPage() {
     if (!confirm('Desativar este produto?')) return;
     await api(`/products/${id}`, { method: 'DELETE' });
     load();
+    toast.success('Produto removido');
   }
 
   function setF(key: string, value: unknown) {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 import { api } from '@/lib/utils';
 import { formatBRL } from '@vendamais/shared';
 import { Users, MessageSquare, TrendingUp, DollarSign, Target, Zap, CalendarDays, Check, X, Bot } from 'lucide-react';
@@ -82,8 +83,10 @@ export default function DashboardPage() {
         body: JSON.stringify({ status: 'confirmed' }),
       });
       setPendingReservations((prev) => prev.filter((r) => r.id !== id));
+      toast.success('Reserva confirmada!');
     } catch (err) {
       console.error('Failed to confirm reservation:', err);
+      toast.error('Erro ao confirmar reserva');
     }
   }
 
@@ -95,8 +98,10 @@ export default function DashboardPage() {
         body: JSON.stringify({ status: 'cancelled' }),
       });
       setPendingReservations((prev) => prev.filter((r) => r.id !== id));
+      toast.success('Reserva cancelada');
     } catch (err) {
       console.error('Failed to cancel reservation:', err);
+      toast.error('Erro ao cancelar reserva');
     }
   }
 
