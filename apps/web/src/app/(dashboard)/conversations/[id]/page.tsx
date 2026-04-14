@@ -98,14 +98,14 @@ export default function ConversationDetailPage() {
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)]">
       {/* Header */}
-      <div className="bg-white border rounded-t-lg p-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link href="/conversations" className="text-muted-foreground hover:text-foreground">
+      <div className="bg-white border rounded-t-lg p-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <Link href="/conversations" className="text-muted-foreground hover:text-foreground flex-shrink-0">
             <ArrowLeft className="h-5 w-5" />
           </Link>
-          <div>
-            <h2 className="font-semibold">{contact?.name || formatPhoneDisplay(contact?.phone || '')}</h2>
-            <div className="flex items-center gap-2 text-xs">
+          <div className="min-w-0">
+            <h2 className="font-semibold truncate">{contact?.name || formatPhoneDisplay(contact?.phone || '')}</h2>
+            <div className="flex items-center gap-2 text-xs flex-wrap">
               <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full">{stateInfo?.label}</span>
               <span className={cn(
                 'px-2 py-0.5 rounded-full',

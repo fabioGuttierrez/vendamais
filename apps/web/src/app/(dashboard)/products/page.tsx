@@ -195,7 +195,7 @@ export default function ProductsPage() {
 
           <section className="space-y-3">
             <h2 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Perfil do evento</h2>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Ideal para">
                 <input className={input} value={form.ideal_for || ''} onChange={(e) => setF('ideal_for', e.target.value)} placeholder="Casamentos, formaturas, corporativo..." />
               </Field>
@@ -329,7 +329,7 @@ export default function ProductsPage() {
             </div>
 
             {expandedId === p.id && (
-              <div className="border-t px-4 py-3 grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+              <div className="border-t px-4 py-3 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
                 {p.ideal_for && <Info label="Ideal para" value={p.ideal_for} />}
                 {p.delivery_time && <Info label="Entrega" value={p.delivery_time} />}
                 {p.pricing_info && <Info label="Investimento" value={p.pricing_info} />}

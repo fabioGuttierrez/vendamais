@@ -286,7 +286,7 @@ export default function ReservationsPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white rounded-lg border p-4">
           <p className="text-sm text-muted-foreground">Total Ativas</p>
           <p className="text-2xl font-bold">{activeReservations.length}</p>
@@ -305,7 +305,7 @@ export default function ReservationsPage() {
       {viewMode === 'calendar' && (
       <>
       <div className="bg-white rounded-lg border p-4">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-start justify-between mb-4 gap-3 flex-wrap">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
@@ -313,7 +313,7 @@ export default function ReservationsPage() {
             >
               &larr;
             </button>
-            <h2 className="text-lg font-semibold capitalize min-w-[180px] text-center">
+            <h2 className="text-lg font-semibold capitalize min-w-[150px] sm:min-w-[180px] text-center">
               {format(currentMonth, 'MMMM yyyy', { locale: ptBR })}
             </h2>
             <button
@@ -323,7 +323,7 @@ export default function ReservationsPage() {
               &rarr;
             </button>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => setSelectedProduct(null)}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
@@ -363,7 +363,8 @@ export default function ReservationsPage() {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-7">
+          <div className="overflow-x-auto">
+          <div className="grid grid-cols-7 min-w-[560px]">
             {/* Week day headers */}
             {weekDays.map((d) => (
               <div key={d} className="text-center text-xs font-medium text-muted-foreground py-2 border-b">
@@ -451,6 +452,7 @@ export default function ReservationsPage() {
                 </div>
               );
             })}
+          </div>
           </div>
         )}
       </div>

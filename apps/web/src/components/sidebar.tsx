@@ -15,6 +15,7 @@ import {
   Settings,
   Package,
   GraduationCap,
+  X,
 } from 'lucide-react';
 
 const navItems = [
@@ -31,17 +32,40 @@ const navItems = [
   { href: '/settings', label: 'Configurações', icon: Settings },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  open?: boolean;
+  onClose?: () => void;
+}
+
+export function Sidebar({ open = false, onClose }: SidebarProps) {
   const pathname = usePathname();
 
   return (
-    <aside className="w-64 bg-white border-r h-screen sticky top-0 flex flex-col">
-      <div className="p-6 border-b">
-        <h1 className="text-xl font-bold text-primary">VendaMais</h1>
-        <p className="text-xs text-muted-foreground">Like Move 360</p>
+    <aside
+      className={cn(
+        'w-64 bg-white border-r flex flex-col',
+        // Mobile: fixed overlay that slides in/out
+        'fixed inset-y-0 left-0 z-30 h-full transition-transform duration-200',
+        open ? 'translate-x-0' : '-translate-x-full',
+        // Desktop: always visible as sticky sidebar
+        'md:relative md:translate-x-0 md:h-screen md:sticky md:top-0',
+      )}
+    >
+      <div className="p-6 border-b flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-primary">VendaMais</h1>
+          <p className="text-xs text-muted-foreground">Like Move 360</p>
+        </div>
+        <button
+          onClick={onClose}
+          className="md:hidden text-muted-foreground hover:text-foreground"
+          aria-label="Fechar menu"
+        >
+          <X className="h-5 w-5" />
+        </button>
       </div>
 
-      <nav className="flex-1 p-4 space-y-1">
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
@@ -50,6 +74,7 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onClose}
               className={cn(
                 'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
                 isActive

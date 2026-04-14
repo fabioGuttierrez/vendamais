@@ -30,7 +30,7 @@ export default function ContactsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold">Contatos</h1>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -39,13 +39,13 @@ export default function ContactsPage() {
             placeholder="Buscar contatos..."
             value={search}
             onChange={(e) => handleSearchChange(e.target.value)}
-            className="pl-9 pr-4 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full sm:w-auto pl-9 pr-4 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           />
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border overflow-hidden">
-        <table className="w-full">
+      <div className="bg-white rounded-lg border overflow-x-auto">
+        <table className="w-full min-w-[560px]">
           <thead className="bg-muted/50">
             <tr>
               <th className="text-left px-4 py-3 text-sm font-medium">Nome</th>
