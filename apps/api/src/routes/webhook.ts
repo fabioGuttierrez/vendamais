@@ -13,10 +13,12 @@ function safeCompare(a: string, b: string): boolean {
 
 export async function webhookRoutes(app: FastifyInstance) {
   app.post('/api/v1/webhook/evolution', async (request, reply) => {
-    // Verify webhook secret (header only — never accept via query string)
+    // Accept secret via header (preferred) or query string (Evolution panel default)
+    const query = request.query as Record<string, string>;
     const apiKey =
       (request.headers['apikey'] as string) ||
       (request.headers['x-webhook-secret'] as string) ||
+      query.secret ||
       '';
     const { webhookSecret } = await getEvolutionConfig();
     if (!apiKey || !webhookSecret || !safeCompare(apiKey, webhookSecret)) {
