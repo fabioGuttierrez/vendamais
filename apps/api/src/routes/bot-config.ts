@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { getSupabase } from '../config/supabase.js';
 import { invalidateEvolutionConfigCache } from '../config/evolution-config.js';
+import { invalidateBotConfigCache } from '../services/conversation-engine.js';
 import { BUILT_IN_PRESETS } from '../ai/agent-presets.js';
 
 const EVOLUTION_CONFIG_KEYS = ['evolution_api_url', 'evolution_api_key', 'evolution_instance_name'];
@@ -45,10 +46,9 @@ export async function botConfigRoutes(app: FastifyInstance) {
 
     if (error) throw error;
 
-    // Invalidate Evolution config cache when relevant keys change
-    if (EVOLUTION_CONFIG_KEYS.includes(key)) {
-      invalidateEvolutionConfigCache();
-    }
+    // Invalidate caches when relevant keys change
+    if (EVOLUTION_CONFIG_KEYS.includes(key)) invalidateEvolutionConfigCache();
+    invalidateBotConfigCache();
 
     return data;
   });
