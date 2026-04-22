@@ -15,6 +15,7 @@ export default function SettingsPage() {
   const [evolutionUrl, setEvolutionUrl] = useState('');
   const [evolutionKey, setEvolutionKey] = useState('');
   const [evolutionInstance, setEvolutionInstance] = useState('');
+  const [webhookSecret, setWebhookSecret] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
@@ -34,6 +35,7 @@ export default function SettingsPage() {
         setEvolutionUrl(get('evolution_api_url') || '');
         setEvolutionKey(get('evolution_api_key') || '');
         setEvolutionInstance(get('evolution_instance_name') || '');
+        setWebhookSecret(get('webhook_secret') || '');
         setAdminPhone((get('admin_whatsapp_number') as string) || '');
       })
       .catch(() => {});
@@ -49,6 +51,7 @@ export default function SettingsPage() {
         { key: 'evolution_api_url', value: evolutionUrl.trim() },
         { key: 'evolution_api_key', value: evolutionKey.trim() },
         { key: 'evolution_instance_name', value: evolutionInstance.trim() },
+        { key: 'webhook_secret', value: webhookSecret.trim() },
       ];
 
       for (const entry of entries) {
@@ -190,6 +193,20 @@ export default function SettingsPage() {
               value={evolutionInstance}
               onChange={(e) => setEvolutionInstance(e.target.value)}
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Webhook Secret (token da instância)</label>
+            <input
+              type="password"
+              className="w-full rounded-md border px-3 py-2 text-sm font-mono"
+              placeholder="Token copiado do painel da Evolution"
+              value={webhookSecret}
+              onChange={(e) => setWebhookSecret(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              É o token exibido abaixo do nome da instância no painel da Evolution API.
+            </p>
           </div>
         </div>
 

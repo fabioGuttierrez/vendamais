@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { fromRemoteJid, normalizePhone } from '@vendamais/shared';
 import { timingSafeEqual } from 'node:crypto';
-import { env } from '../config/env.js';
+import { getEvolutionConfig } from '../config/evolution-config.js';
 import { messageQueue } from '../queues/connection.js';
 import { logger } from '../utils/logger.js';
 import type { InboundMessageJob } from '../queues/message.worker.js';
@@ -18,7 +18,8 @@ export async function webhookRoutes(app: FastifyInstance) {
       (request.headers['apikey'] as string) ||
       (request.headers['x-webhook-secret'] as string) ||
       '';
-    if (!apiKey || !safeCompare(apiKey, env.WEBHOOK_SECRET)) {
+    const { webhookSecret } = await getEvolutionConfig();
+    if (!apiKey || !webhookSecret || !safeCompare(apiKey, webhookSecret)) {
       logger.warn('Webhook auth failed');
       return reply.status(401).send({ error: 'Unauthorized' });
     }

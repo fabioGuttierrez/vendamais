@@ -4,7 +4,7 @@ import { invalidateEvolutionConfigCache } from '../config/evolution-config.js';
 import { invalidateBotConfigCache } from '../services/conversation-engine.js';
 import { BUILT_IN_PRESETS } from '../ai/agent-presets.js';
 
-const EVOLUTION_CONFIG_KEYS = ['evolution_api_url', 'evolution_api_key', 'evolution_instance_name'];
+const EVOLUTION_CONFIG_KEYS = ['evolution_api_url', 'evolution_api_key', 'evolution_instance_name', 'webhook_secret'];
 
 const ALLOWED_CONFIG_KEYS = new Set([
   'greeting_message',

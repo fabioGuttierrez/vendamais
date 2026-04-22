@@ -6,6 +6,7 @@ interface EvolutionConfig {
   apiUrl: string;
   apiKey: string;
   instanceName: string;
+  webhookSecret: string;
 }
 
 let configCache: EvolutionConfig | null = null;
@@ -27,7 +28,7 @@ export async function getEvolutionConfig(): Promise<EvolutionConfig> {
     const { data } = await supabase
       .from('bot_config')
       .select('key, value')
-      .in('key', ['evolution_api_url', 'evolution_api_key', 'evolution_instance_name']);
+      .in('key', ['evolution_api_url', 'evolution_api_key', 'evolution_instance_name', 'webhook_secret']);
 
     const dbConfig = Object.fromEntries((data || []).map((c) => [c.key, c.value]));
 
@@ -35,6 +36,7 @@ export async function getEvolutionConfig(): Promise<EvolutionConfig> {
       apiUrl: (dbConfig.evolution_api_url as string) || env.EVOLUTION_API_URL,
       apiKey: (dbConfig.evolution_api_key as string) || env.EVOLUTION_API_KEY,
       instanceName: (dbConfig.evolution_instance_name as string) || env.EVOLUTION_INSTANCE_NAME,
+      webhookSecret: (dbConfig.webhook_secret as string) || env.WEBHOOK_SECRET,
     };
 
     cacheExpiry = now + CACHE_TTL;
@@ -45,6 +47,7 @@ export async function getEvolutionConfig(): Promise<EvolutionConfig> {
       apiUrl: env.EVOLUTION_API_URL,
       apiKey: env.EVOLUTION_API_KEY,
       instanceName: env.EVOLUTION_INSTANCE_NAME,
+      webhookSecret: env.WEBHOOK_SECRET,
     };
   }
 }
