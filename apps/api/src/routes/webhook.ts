@@ -89,8 +89,10 @@ export async function webhookRoutes(app: FastifyInstance) {
     };
 
     // Enqueue for async processing — jobId deduplicates by message ID (prevents double processing)
+    const rawId = job.evolutionMessageId || `${job.phoneNormalized}_${job.timestamp}`;
+    const jobId = `msg_${rawId.replace(/:/g, '_')}`;
     await messageQueue.add('process-message', job, {
-      jobId: `msg:${job.evolutionMessageId || job.phoneNormalized + ':' + job.timestamp}`,
+      jobId,
       delay: 500,
       attempts: 3,
       backoff: { type: 'exponential', delay: 2000 },
