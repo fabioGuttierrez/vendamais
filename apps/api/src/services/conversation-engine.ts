@@ -13,13 +13,22 @@ import type { FollowUpJob } from '../queues/follow-up.worker.js';
 
 const supabase = () => getSupabase();
 
-// Cache training insights for 5 minutes
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Cache training insights
 let cachedInsights: string | null = null;
 let insightsCacheTime = 0;
-const INSIGHTS_CACHE_TTL = 5 * 60 * 1000;
+
+// Cache products
+let cachedProducts: any[] | null = null;
+let productsCacheTime = 0;
+
+// Cache bot config
+let cachedBotConfig: any[] | null = null;
+let botConfigCacheTime = 0;
 
 async function getTrainingInsights(): Promise<string> {
-  if (cachedInsights !== null && Date.now() - insightsCacheTime < INSIGHTS_CACHE_TTL) {
+  if (cachedInsights !== null && Date.now() - insightsCacheTime < CACHE_TTL) {
     return cachedInsights;
   }
   const { data } = await supabase()
@@ -39,6 +48,36 @@ async function getTrainingInsights(): Promise<string> {
   );
   insightsCacheTime = Date.now();
   return cachedInsights;
+}
+
+async function getProducts(): Promise<any[]> {
+  if (cachedProducts !== null && Date.now() - productsCacheTime < CACHE_TTL) {
+    return cachedProducts;
+  }
+  const { data } = await supabase().from('products').select('*').eq('active', true).order('sort_order');
+  cachedProducts = data || [];
+  productsCacheTime = Date.now();
+  return cachedProducts;
+}
+
+async function getBotConfig(): Promise<any[]> {
+  if (cachedBotConfig !== null && Date.now() - botConfigCacheTime < CACHE_TTL) {
+    return cachedBotConfig;
+  }
+  const { data } = await supabase().from('bot_config').select('key, value');
+  cachedBotConfig = data || [];
+  botConfigCacheTime = Date.now();
+  return cachedBotConfig;
+}
+
+export function invalidateBotConfigCache() {
+  cachedBotConfig = null;
+  botConfigCacheTime = 0;
+}
+
+export function invalidateProductsCache() {
+  cachedProducts = null;
+  productsCacheTime = 0;
 }
 
 export async function processInboundMessage(job: InboundMessageJob): Promise<void> {
@@ -122,14 +161,11 @@ export async function processInboundMessage(job: InboundMessageJob): Promise<voi
   // 4. Store inbound message
   await storeMessage(conversation.id, contact.id, content, 'inbound', 'customer', evolutionMessageId, mediaUrl, messageType);
 
-  // 5. Load products and bot config
-  const [productsRes, botConfigRes] = await Promise.all([
-    supabase().from('products').select('*').eq('active', true).order('sort_order'),
-    supabase().from('bot_config').select('key, value'),
+  // 5. Load products and bot config (cached)
+  const [products, botConfigs] = await Promise.all([
+    getProducts(),
+    getBotConfig(),
   ]);
-
-  const products = productsRes.data;
-  const botConfigs = botConfigRes.data || [];
   const greetingMessage = botConfigs.find((c) => c.key === 'greeting_message')?.value as string | undefined;
   const customPrompt = botConfigs.find((c) => c.key === 'custom_prompt')?.value as string | undefined;
   const activePresetId = (botConfigs.find((c) => c.key === 'active_agent_preset_id')?.value as string) || DEFAULT_PRESET_ID;
@@ -151,13 +187,29 @@ export async function processInboundMessage(job: InboundMessageJob): Promise<voi
     contact: { name: contact.name, phone: contact.phone },
   };
 
+  // Build dynamic context as a system message injected at the start of message history
+  // This keeps the system prompt static (maximizing cache hit) while still providing fresh state
+  const qual = (conversation.qualification_data || {}) as Record<string, unknown>;
+  const dynamicContext = [
+    `[CONTEXTO ATUAL — atualizado a cada mensagem]`,
+    `Estado: ${conversation.state.toUpperCase()}`,
+    `Qualificação coletada:`,
+    `- Nome: ${qual.customer_name || 'NÃO COLETADO'}`,
+    `- Tipo de evento: ${qual.event_type || 'NÃO COLETADO'}`,
+    `- Data do evento: ${qual.event_date || 'NÃO COLETADO'}`,
+    `- Convidados: ${qual.estimated_guests || 'NÃO COLETADO'}`,
+    `- Cidade: ${qual.city || 'NÃO COLETADO'}`,
+    `- Orçamento: ${qual.budget_range || 'NÃO COLETADO'}`,
+  ].join('\n');
+
   let aiResponse;
   try {
     aiResponse = await generateResponse(
       conversationWithContact,
       products || [],
-      (recentMessages || []).slice(0, -1), // exclude current inbound (we pass it separately)
+      (recentMessages || []).slice(0, -1),
       content,
+      dynamicContext,
       async (toolName, input) => executeToolCall(toolName, input, conversation!, contact),
       customPrompt,
       greetingMessage,

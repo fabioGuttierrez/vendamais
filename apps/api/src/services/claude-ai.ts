@@ -37,6 +37,7 @@ export async function generateResponse(
   products: Product[],
   recentMessages: Message[],
   inboundText: string,
+  dynamicContext: string,
   executeToolCall: (name: string, input: Record<string, unknown>) => Promise<unknown>,
   customPrompt?: string,
   greetingMessage?: string,
@@ -52,16 +53,20 @@ export async function generateResponse(
     i === tools.length - 1 ? { ...tool, cache_control: { type: 'ephemeral' as const } } : tool,
   );
 
-  // System prompt as cacheable content block
+  // System prompt as cacheable content block (static — no dynamic state here)
   const systemWithCache = [
     { type: 'text' as const, text: systemPrompt, cache_control: { type: 'ephemeral' as const } },
   ];
 
-  // Build message history from recent messages
-  const messages: MessageParam[] = recentMessages.map((msg) => ({
-    role: msg.direction === 'inbound' ? ('user' as const) : ('assistant' as const),
-    content: msg.content,
-  }));
+  // Build message history: inject dynamic context as first user message, then history, then current message
+  const messages: MessageParam[] = [
+    { role: 'user', content: dynamicContext },
+    { role: 'assistant', content: 'Entendido. Vou considerar esse contexto.' },
+    ...recentMessages.map((msg) => ({
+      role: msg.direction === 'inbound' ? ('user' as const) : ('assistant' as const),
+      content: msg.content,
+    })),
+  ];
 
   // Add current inbound message
   messages.push({ role: 'user', content: inboundText });

@@ -85,8 +85,9 @@ export async function webhookRoutes(app: FastifyInstance) {
       timestamp: data.messageTimestamp || Date.now(),
     };
 
-    // Enqueue for async processing with short delay for message batching
+    // Enqueue for async processing — jobId deduplicates by message ID (prevents double processing)
     await messageQueue.add('process-message', job, {
+      jobId: `msg:${job.evolutionMessageId || job.phoneNormalized + ':' + job.timestamp}`,
       delay: 500,
       attempts: 3,
       backoff: { type: 'exponential', delay: 2000 },

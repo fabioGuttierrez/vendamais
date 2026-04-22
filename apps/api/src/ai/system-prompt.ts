@@ -1,4 +1,4 @@
-import type { Conversation, Product, QualificationData } from '@vendamais/shared';
+import type { Conversation, Product } from '@vendamais/shared';
 
 export function buildSystemPrompt(
   conversation: Conversation & { contact: { name: string | null; phone: string } },
@@ -8,8 +8,6 @@ export function buildSystemPrompt(
   persona?: { persona: string; greetingStyle: string },
   trainingInsights?: string,
 ): string {
-  const qual = conversation.qualification_data as QualificationData;
-  const contactName = qual.customer_name || conversation.contact.name || 'cliente';
 
   const productCatalog = products
     .filter((p) => p.active)
@@ -42,15 +40,6 @@ export function buildSystemPrompt(
       return lines.join('\n');
     })
     .join('\n\n');
-
-  const qualStatus = [
-    `- Nome: ${qual.customer_name || 'NÃO COLETADO'}`,
-    `- Tipo de evento: ${qual.event_type || 'NÃO COLETADO'}`,
-    `- Data do evento: ${qual.event_date || 'NÃO COLETADO'}`,
-    `- Convidados: ${qual.estimated_guests || 'NÃO COLETADO'}`,
-    `- Cidade: ${qual.city || 'NÃO COLETADO'}`,
-    `- Orçamento: ${qual.budget_range || 'NÃO COLETADO'}`,
-  ].join('\n');
 
   const customInstructions = customPrompt ? `\n## INSTRUÇÕES ADICIONAIS DO OPERADOR\n${customPrompt}\n` : '';
   const trainingBlock = trainingInsights ? `\n${trainingInsights}\n` : '';
@@ -137,10 +126,9 @@ Você tem acesso ao sistema de reservas da Like Move 360. Cada produto é uma UN
 4. SEMPRE faça UMA pergunta por mensagem para manter o cliente engajado
 5. SEMPRE registre dados com update_qualification e atualize o estado
 
-## ESTADO ATUAL DA CONVERSA: ${conversation.state.toUpperCase()}
-
-## CHECKLIST DE QUALIFICAÇÃO
-${qualStatus}
+## ESTADO E QUALIFICAÇÃO
+O contexto atual da conversa (estado, dados coletados) é injetado no início de cada troca de mensagens.
+Consulte sempre o [CONTEXTO ATUAL] fornecido para saber o estado e o que já foi qualificado.
 
 ## FLUXO DE ATENDIMENTO (SEGUIR RIGOROSAMENTE)
 

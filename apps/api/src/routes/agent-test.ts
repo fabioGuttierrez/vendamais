@@ -107,11 +107,25 @@ export async function agentTestRoutes(app: FastifyInstance) {
       // Collect tool calls for display
       const toolCalls: { toolName: string; input: Record<string, unknown> }[] = [];
 
+      // Dynamic context injected as first message (mirrors production behaviour)
+      const dynamicContext = [
+        `[CONTEXTO ATUAL — atualizado a cada mensagem]`,
+        `Estado: ${currentState.toUpperCase()}`,
+        `Qualificação coletada:`,
+        `- Nome: ${(currentQualification as any).customer_name || 'NÃO COLETADO'}`,
+        `- Tipo de evento: ${(currentQualification as any).event_type || 'NÃO COLETADO'}`,
+        `- Data do evento: ${(currentQualification as any).event_date || 'NÃO COLETADO'}`,
+        `- Convidados: ${(currentQualification as any).estimated_guests || 'NÃO COLETADO'}`,
+        `- Cidade: ${(currentQualification as any).city || 'NÃO COLETADO'}`,
+        `- Orçamento: ${(currentQualification as any).budget_range || 'NÃO COLETADO'}`,
+      ].join('\n');
+
       const aiResponse = await generateResponse(
         fakeConversation as any,
         products || [],
         recentMessages as any[],
         body.message,
+        dynamicContext,
         async (toolName, input) => {
           toolCalls.push({ toolName, input });
           const result = mockToolCall(toolName, input);
