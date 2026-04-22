@@ -417,7 +417,7 @@ async function executeToolCall(
     }
 
     case 'schedule_follow_up': {
-      const delayHours = (input.delay_hours as number) || 24;
+      const delayHours = (input.delay_hours as number) ?? 24;
       const scheduledFor = new Date(Date.now() + delayHours * 60 * 60 * 1000);
 
       const { data: followUp } = await supabase()

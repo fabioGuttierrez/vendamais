@@ -76,13 +76,10 @@ export default function SettingsPage() {
       ];
 
       for (const entry of entries) {
-        if (entry.value) {
-          await api(`/bot-config/${entry.key}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ value: entry.value }),
-          });
-        }
+        await api(`/bot-config/${entry.key}`, {
+          method: 'PUT',
+          body: JSON.stringify({ value: entry.value }),
+        });
       }
 
       setSaveMessage('Configurações salvas com sucesso!');

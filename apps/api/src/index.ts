@@ -38,10 +38,14 @@ async function main() {
   await registerAuth(app);
   await app.register(import('@fastify/multipart'), { limits: { fileSize: 10 * 1024 * 1024 } });
 
-  // Global rate limit (per IP)
+  // Global rate limit (per IP) — webhook is excluded (Evolution API has a fixed IP)
   await app.register(rateLimit, {
     max: 100,
     timeWindow: '1 minute',
+    keyGenerator: (request) => {
+      if ((request.routeOptions as any)?.url === '/api/v1/webhook/evolution') return null as any;
+      return request.ip;
+    },
   });
 
   // Public routes (no auth required)
