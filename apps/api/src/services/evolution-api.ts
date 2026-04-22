@@ -64,6 +64,44 @@ export async function sendMedia(
   }
 }
 
+export interface EvolutionMessage {
+  key: { remoteJid: string; fromMe: boolean; id: string };
+  message?: {
+    conversation?: string;
+    extendedTextMessage?: { text: string };
+    imageMessage?: { caption?: string };
+    audioMessage?: Record<string, unknown>;
+    videoMessage?: { caption?: string };
+    documentMessage?: { fileName?: string };
+  };
+  messageTimestamp: number;
+  pushName?: string;
+}
+
+export async function fetchMessageHistory(
+  phone: string,
+  limit = 30,
+): Promise<EvolutionMessage[]> {
+  try {
+    const config = await getEvolutionConfig();
+    const remoteJid = `${phone}@s.whatsapp.net`;
+    const url = `${config.apiUrl}/chat/findMessages/${config.instanceName}`;
+
+    const res = await fetchWithRetry(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: config.apiKey },
+      body: JSON.stringify({ where: { key: { remoteJid } }, limit }),
+    });
+
+    if (!res.ok) return [];
+    const data = await res.json() as { messages?: { records?: EvolutionMessage[] } } | EvolutionMessage[];
+    if (Array.isArray(data)) return data;
+    return (data as any)?.messages?.records ?? [];
+  } catch {
+    return [];
+  }
+}
+
 export async function getConnectionState(): Promise<string> {
   try {
     const config = await getEvolutionConfig();

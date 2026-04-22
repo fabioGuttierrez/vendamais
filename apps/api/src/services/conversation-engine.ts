@@ -2,7 +2,7 @@ import { getSupabase } from '../config/supabase.js';
 import { logger } from '../utils/logger.js';
 import { toE164 } from '@vendamais/shared';
 import type { AgentPreset, ConversationState } from '@vendamais/shared';
-import { sendText } from './evolution-api.js';
+import { sendText, fetchMessageHistory } from './evolution-api.js';
 import { generateResponse } from './claude-ai.js';
 import { transcribeAudio } from './audio-transcription.js';
 import { followUpQueue } from '../queues/connection.js';
@@ -181,7 +181,35 @@ export async function processInboundMessage(job: InboundMessageJob): Promise<voi
     .order('created_at', { ascending: true })
     .limit(10);
 
-  // 7. Generate AI response
+  // 7. Fetch Evolution history for context when local history is sparse
+  //    (covers: human replied from phone, first bot message after takeover, etc.)
+  let evolutionHistoryContext = '';
+  if ((recentMessages || []).length < 5) {
+    const evolutionMsgs = await fetchMessageHistory(phoneNormalized, 30);
+    if (evolutionMsgs.length > 0) {
+      const localIds = new Set(
+        (recentMessages || []).map((m) => m.evolution_message_id).filter(Boolean),
+      );
+      const externalMsgs = evolutionMsgs.filter((m) => !localIds.has(m.key.id));
+      if (externalMsgs.length > 0) {
+        const lines = externalMsgs.map((m) => {
+          const who = m.key.fromMe ? 'Bot/Atendente' : (m.pushName || 'Cliente');
+          const text =
+            m.message?.conversation ||
+            m.message?.extendedTextMessage?.text ||
+            m.message?.imageMessage?.caption ||
+            m.message?.videoMessage?.caption ||
+            m.message?.documentMessage?.fileName ||
+            (m.message?.audioMessage ? '[Áudio]' : '[Mensagem não textual]');
+          return `[${who}]: ${text}`;
+        });
+        evolutionHistoryContext = `[HISTÓRICO ANTERIOR (mensagens fora da plataforma)]\n${lines.join('\n')}`;
+        logger.info({ phone, count: externalMsgs.length }, 'Evolution history loaded for context');
+      }
+    }
+  }
+
+  // 8. Generate AI response
   const conversationWithContact = {
     ...conversation,
     contact: { name: contact.name, phone: contact.phone },
@@ -204,12 +232,16 @@ export async function processInboundMessage(job: InboundMessageJob): Promise<voi
 
   let aiResponse;
   try {
+    const fullDynamicContext = evolutionHistoryContext
+      ? `${evolutionHistoryContext}\n\n${dynamicContext}`
+      : dynamicContext;
+
     aiResponse = await generateResponse(
       conversationWithContact,
       products || [],
       (recentMessages || []).slice(0, -1),
       content,
-      dynamicContext,
+      fullDynamicContext,
       async (toolName, input) => executeToolCall(toolName, input, conversation!, contact),
       customPrompt,
       greetingMessage,
@@ -260,7 +292,7 @@ export async function processInboundMessage(job: InboundMessageJob): Promise<voi
     return;
   }
 
-  // 8. Store outbound message FIRST (so we never lose the AI response)
+  // 9. Store outbound message FIRST (so we never lose the AI response)
   await storeMessage(
     conversation.id,
     contact.id,
