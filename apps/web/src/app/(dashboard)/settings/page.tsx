@@ -19,6 +19,8 @@ export default function SettingsPage() {
   const [showKey, setShowKey] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [adminPhone, setAdminPhone] = useState('');
   const [savingPhone, setSavingPhone] = useState(false);
   const [phoneMessage, setPhoneMessage] = useState('');
@@ -42,6 +44,25 @@ export default function SettingsPage() {
   }, []);
 
   const isConnected = whatsappStatus === 'open';
+
+  async function testConnection() {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await api<{ whatsapp: { state: string; instanceName?: string; number?: string } }>('/health');
+      const state = res.whatsapp?.state;
+      if (state === 'open') {
+        const num = res.whatsapp?.number ? ` (${res.whatsapp.number})` : '';
+        setTestResult({ ok: true, message: `Conectado${num}` });
+      } else {
+        setTestResult({ ok: false, message: `Estado: ${state || 'desconhecido'}` });
+      }
+    } catch {
+      setTestResult({ ok: false, message: 'Falha ao conectar com a API' });
+    } finally {
+      setTesting(false);
+    }
+  }
 
   async function saveEvolutionConfig() {
     setSaving(true);
@@ -210,7 +231,7 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 pt-2">
+        <div className="flex items-center gap-3 pt-2 flex-wrap">
           <button
             className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
             onClick={saveEvolutionConfig}
@@ -219,9 +240,22 @@ export default function SettingsPage() {
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             Salvar
           </button>
+          <button
+            className="inline-flex items-center gap-2 border px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
+            onClick={testConnection}
+            disabled={testing}
+          >
+            {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wifi className="h-4 w-4" />}
+            Testar Conexão
+          </button>
           {saveMessage && (
             <span className={`text-sm ${saveMessage.includes('Erro') ? 'text-red-600' : 'text-green-600'}`}>
               {saveMessage}
+            </span>
+          )}
+          {testResult && (
+            <span className={`text-sm font-medium ${testResult.ok ? 'text-green-600' : 'text-red-600'}`}>
+              {testResult.ok ? '✓' : '✗'} {testResult.message}
             </span>
           )}
         </div>
